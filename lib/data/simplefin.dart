@@ -194,7 +194,7 @@ class SimpleFinClient {
     return access;
   }
 
-  /// Reads accounts, and their transactions in [start]..[end] (at most 90
+  /// Reads accounts, and their transactions in [start]..[end] (at most 45
   /// days apart, per the Bridge). With [balancesOnly] no transactions are
   /// returned, which is cheaper and is what linking accounts needs.
   Future<SimpleFinData> fetch(

@@ -63,9 +63,9 @@ class SimpleFinSyncResult {
 ///    can safely re-read an overlapping window.
 ///  * Each import is a batch, so it can be undone like a CSV import.
 extension SimpleFinRepository on HomebaseRepository {
-  /// The Bridge asks for at most 90 days per request and about 5 days of
+  /// The Bridge recommends at most 45 days per request and about 5 days of
   /// overlap between runs so late-posting items are not missed.
-  static const _window = Duration(days: 90);
+  static const _window = Duration(days: 45);
   static const _overlap = Duration(days: 5);
 
   Stream<List<SimpleFinConnection>> watchSimpleFinConnections({
@@ -166,7 +166,7 @@ extension SimpleFinRepository on HomebaseRepository {
                 : conn.lastSyncAt!.subtract(_overlap));
       if (start.isAfter(now)) start = now.subtract(_overlap);
 
-      // One request per 90 day slice, oldest first.
+      // One request per 45 day slice, oldest first.
       final transactions = <String, Map<String, SimpleFinTransaction>>{};
       SimpleFinData? latest;
       final messages = <String>[];
@@ -1145,10 +1145,10 @@ extension SimpleFinRepository on HomebaseRepository {
     });
   }
 
-  /// Whether any bank entry from the last 90 days has no payee yet, which a
+  /// Whether any bank entry from the last 45 days has no payee yet, which a
   /// wider read of the feed would fill in.
   Future<bool> hasEntriesMissingPayee(int profileId, {DateTime? now}) async {
-    final since = (now ?? DateTime.now()).subtract(const Duration(days: 90));
+    final since = (now ?? DateTime.now()).subtract(const Duration(days: 45));
     final row =
         await (_db.select(_db.budgetEntries)
               ..where(

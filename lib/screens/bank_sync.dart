@@ -68,11 +68,11 @@ class _BankSyncSectionState extends ConsumerState<BankSyncSection> {
 
   Future<void> _sync({Duration? lookback}) => _run(() async {
     // Entries imported before payees were kept get filled in by reading the
-    // last 90 days once; after that the normal short window is enough.
+    // last 45 days once; after that the normal short window is enough.
     final wide =
         lookback ??
         (await _repo.hasEntriesMissingPayee(_profileId)
-            ? const Duration(days: 90)
+            ? const Duration(days: 45)
             : null);
     final r = await _repo.syncSimpleFin(
       profileId: _profileId,
@@ -136,7 +136,7 @@ class _BankSyncSectionState extends ConsumerState<BankSyncSection> {
     await _repo.syncSimpleFin(
       profileId: _profileId,
       client: ref.read(simpleFinClientProvider),
-      lookback: const Duration(days: 90),
+      lookback: const Duration(days: 45),
     );
   });
 
@@ -185,7 +185,7 @@ class _BankSyncSectionState extends ConsumerState<BankSyncSection> {
       await _repo.syncSimpleFin(
         profileId: _profileId,
         client: ref.read(simpleFinClientProvider),
-        lookback: const Duration(days: 90),
+        lookback: const Duration(days: 45),
       );
     });
   }
@@ -244,14 +244,15 @@ class _BankSyncSectionState extends ConsumerState<BankSyncSection> {
                       'they stop creating their own entries on synced '
                       'accounts so nothing is counted twice.',
                   'History builds locally. The Bridge only reaches back '
-                      'about 90 days, but everything Clearly saves is kept, '
+                      'about 45 days at a time, but everything Clearly saves is kept, '
                       'so six months and year-to-date fill in as it runs. '
                       'The first sync also reconstructs daily balances for '
                       'the days it can see.',
-                  'Clearly syncs by itself once a day at 1:30 AM while it is '
-                      'open, and whenever you press Sync now. Opening the app '
-                      'does not sync. The SimpleFIN Bridge allows about 24 '
-                      'refreshes a day, so syncing is not meant to be '
+                  'Clearly syncs once a day, from 1:30 AM on. If Clearly was '
+                      'closed or asleep then, it catches up the next time it '
+                      'is open, so a day is never skipped. Sync now is there '
+                      'whenever you want one. The SimpleFIN Bridge allows '
+                      'about 24 refreshes a day, so it is not meant to be '
                       'instant.',
                   'This is optional. Without it, everything works by hand.',
                 ],

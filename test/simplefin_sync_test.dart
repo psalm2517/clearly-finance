@@ -257,7 +257,7 @@ void main() {
     expect(conn.lastSyncMessage, contains('connect again'));
   });
 
-  test('a long gap is read in windows of at most 90 days', () async {
+  test('a long gap is read in windows of at most 45 days', () async {
     await repo.connectSimpleFin(
         profileId: profileId, setupToken: token(), client: client, now: now);
     bridge.fetches.clear();
@@ -266,11 +266,11 @@ void main() {
         client: client,
         now: now,
         lookback: const Duration(days: 200));
-    expect(bridge.fetches, hasLength(3));
+    expect(bridge.fetches, hasLength(5), reason: '200 days in 45 day slices');
     for (final u in bridge.fetches) {
       final s = int.parse(u.queryParameters['start-date']!);
       final e = int.parse(u.queryParameters['end-date']!);
-      expect(e - s, lessThanOrEqualTo(90 * 86400));
+      expect(e - s, lessThanOrEqualTo(45 * 86400));
     }
   });
 

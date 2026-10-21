@@ -105,9 +105,9 @@ works exactly the same by hand without it.
   of the budget.
 - History builds on your own computer, so six months and year to date fill
   in as it runs.
-- It is meant to sync once a day, and does so automatically at 1:30 AM while
-  Clearly is open. Opening the app does not sync, and Sync now is there when
-  you need it.
+- It syncs once a day, from 1:30 AM on. If Clearly was closed or the
+  computer asleep then, it catches up the next time Clearly is open, so a day
+  is never skipped. Sync now is there when you want one.
 - Bills, paychecks and repeating transactions no longer add entries beside
   the bank's. A bank transaction marks the matching bill paid or paycheck
   received.

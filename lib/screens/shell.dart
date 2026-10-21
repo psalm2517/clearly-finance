@@ -21,14 +21,21 @@ import 'recurring_hub.dart';
 import 'settings.dart';
 import 'transactions.dart';
 
-/// The next 1:30 AM, local time: tonight if it has not passed yet, otherwise
-/// tomorrow night. When the bank feed is synced automatically.
-DateTime nextNightlySyncTime(DateTime now) {
-  final tonight = DateTime(now.year, now.month, now.day, 1, 30);
-  return tonight.isAfter(now)
-      ? tonight
-      : DateTime(now.year, now.month, now.day + 1, 1, 30);
+/// The most recent 1:30 AM, local time, at or before [now].
+DateTime lastSyncSlot(DateTime now) {
+  final today = DateTime(now.year, now.month, now.day, 1, 30);
+  return today.isAfter(now)
+      ? DateTime(now.year, now.month, now.day - 1, 1, 30)
+      : today;
 }
+
+/// Whether the daily bank sync is owed: it is due once a day, at 1:30 AM, and
+/// is owed whenever the last successful sync is older than the most recent
+/// 1:30 AM. Because it compares against the clock rather than waiting for a
+/// timer, a night the app was closed or the computer asleep is made up at the
+/// next chance, and a day is never skipped.
+bool dailySyncDue(DateTime now, DateTime? lastSyncAt) =>
+    lastSyncAt == null || lastSyncAt.isBefore(lastSyncSlot(now));
 
 /// Desktop shell: NavigationRail sidebar + content. Only admins see the
 /// profile switcher; non-admins have no indication other profiles exist.
@@ -39,43 +46,65 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell>
+    with WidgetsBindingObserver {
   int? _caughtUpFor;
-  Timer? _nightly;
+  Timer? _poll;
+  var _syncing = false;
+  DateTime? _lastAttempt;
 
-  /// Syncs the bank feed once a day at 1:30 AM, while Clearly is open. It is
-  /// the only automatic sync; starting the app does not sync.
-  void _scheduleNightlySync() {
-    _nightly?.cancel();
-    final wait = nextNightlySyncTime(DateTime.now()).difference(DateTime.now());
-    _nightly = Timer(wait, () async {
-      try {
-        final profile = ref.read(activeProfileProvider) ??
-            ref.read(loggedInProfileProvider);
-        if (profile != null) {
-          final repo = ref.read(repositoryProvider);
-          await repo.syncSimpleFin(
-            profileId: profile.id,
-            client: ref.read(simpleFinClientProvider),
-          );
-        }
-      } catch (_) {
-        // The result, good or bad, is kept on the connection and shown in
-        // Settings; a failed night should not interrupt anything.
-      }
-      if (mounted) _scheduleNightlySync();
-    });
+  /// Syncs the bank feed once a day. The check is cheap and local, so it runs
+  /// when Clearly opens, when it comes back from sleep, and every few
+  /// minutes while it is open; it only reaches the network when a day's sync
+  /// is actually owed (see [dailySyncDue]). A failed attempt is retried at
+  /// most once an hour, well inside the bridge's daily limit.
+  Future<void> _syncIfDue() async {
+    if (_syncing || !mounted) return;
+    final now = DateTime.now();
+    final last = _lastAttempt;
+    if (last != null && now.difference(last) < const Duration(hours: 1)) return;
+    final profile =
+        ref.read(activeProfileProvider) ?? ref.read(loggedInProfileProvider);
+    if (profile == null) return;
+    _syncing = true;
+    try {
+      final repo = ref.read(repositoryProvider);
+      final connections =
+          await repo.watchSimpleFinConnections(profileId: profile.id).first;
+      if (connections.isEmpty) return;
+      final owed = connections.any((c) => dailySyncDue(now, c.lastSyncAt));
+      if (!owed) return;
+      _lastAttempt = now;
+      await repo.syncSimpleFin(
+        profileId: profile.id,
+        client: ref.read(simpleFinClientProvider),
+      );
+    } catch (_) {
+      // The outcome, good or bad, is kept on the connection and shown in
+      // Settings; a failed attempt should not interrupt anything.
+    } finally {
+      _syncing = false;
+    }
   }
 
   @override
   void initState() {
     super.initState();
-    _scheduleNightlySync();
+    WidgetsBinding.instance.addObserver(this);
+    _poll = Timer.periodic(
+        const Duration(minutes: 5), (_) => _syncIfDue());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncIfDue());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _syncIfDue();
   }
 
   @override
   void dispose() {
-    _nightly?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _poll?.cancel();
     super.dispose();
   }
 
