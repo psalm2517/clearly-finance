@@ -8265,6 +8265,17 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
       'REFERENCES accounts (id)',
     ),
   );
+  static const VerificationMeta _externalIdMeta = const VerificationMeta(
+    'externalId',
+  );
+  @override
+  late final GeneratedColumn<String> externalId = GeneratedColumn<String>(
+    'external_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -8275,6 +8286,7 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
     date,
     note,
     fromAccountId,
+    externalId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -8341,6 +8353,12 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
         ),
       );
     }
+    if (data.containsKey('external_id')) {
+      context.handle(
+        _externalIdMeta,
+        externalId.isAcceptableOrUnknown(data['external_id']!, _externalIdMeta),
+      );
+    }
     return context;
   }
 
@@ -8384,6 +8402,10 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
         DriftSqlType.int,
         data['${effectivePrefix}from_account_id'],
       ),
+      externalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_id'],
+      ),
     );
   }
 
@@ -8415,6 +8437,14 @@ class Payment extends DataClass implements Insertable<Payment> {
   /// Optional — logging a payment still works without it, same as before;
   /// setting it also deducts the amount from that account's balance.
   final int? fromAccountId;
+
+  /// Which bank transactions this payment stands for, once any has been
+  /// matched to it: `;OUT=<id>` for the withdrawal from the paying account,
+  /// `;IN=<id>` for the credit on the card, or both. A payment typed in by
+  /// hand has none until the bank reports it, and then the bank's
+  /// transactions are folded into it instead of being counted beside it.
+  /// `legacy` marks one made from the bank before this was recorded.
+  final String? externalId;
   const Payment({
     required this.id,
     required this.profileId,
@@ -8424,6 +8454,7 @@ class Payment extends DataClass implements Insertable<Payment> {
     required this.date,
     this.note,
     this.fromAccountId,
+    this.externalId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -8444,6 +8475,9 @@ class Payment extends DataClass implements Insertable<Payment> {
     if (!nullToAbsent || fromAccountId != null) {
       map['from_account_id'] = Variable<int>(fromAccountId);
     }
+    if (!nullToAbsent || externalId != null) {
+      map['external_id'] = Variable<String>(externalId);
+    }
     return map;
   }
 
@@ -8459,6 +8493,9 @@ class Payment extends DataClass implements Insertable<Payment> {
       fromAccountId: fromAccountId == null && nullToAbsent
           ? const Value.absent()
           : Value(fromAccountId),
+      externalId: externalId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(externalId),
     );
   }
 
@@ -8478,6 +8515,7 @@ class Payment extends DataClass implements Insertable<Payment> {
       date: serializer.fromJson<DateTime>(json['date']),
       note: serializer.fromJson<String?>(json['note']),
       fromAccountId: serializer.fromJson<int?>(json['fromAccountId']),
+      externalId: serializer.fromJson<String?>(json['externalId']),
     );
   }
   @override
@@ -8494,6 +8532,7 @@ class Payment extends DataClass implements Insertable<Payment> {
       'date': serializer.toJson<DateTime>(date),
       'note': serializer.toJson<String?>(note),
       'fromAccountId': serializer.toJson<int?>(fromAccountId),
+      'externalId': serializer.toJson<String?>(externalId),
     };
   }
 
@@ -8506,6 +8545,7 @@ class Payment extends DataClass implements Insertable<Payment> {
     DateTime? date,
     Value<String?> note = const Value.absent(),
     Value<int?> fromAccountId = const Value.absent(),
+    Value<String?> externalId = const Value.absent(),
   }) => Payment(
     id: id ?? this.id,
     profileId: profileId ?? this.profileId,
@@ -8517,6 +8557,7 @@ class Payment extends DataClass implements Insertable<Payment> {
     fromAccountId: fromAccountId.present
         ? fromAccountId.value
         : this.fromAccountId,
+    externalId: externalId.present ? externalId.value : this.externalId,
   );
   Payment copyWithCompanion(PaymentsCompanion data) {
     return Payment(
@@ -8534,6 +8575,9 @@ class Payment extends DataClass implements Insertable<Payment> {
       fromAccountId: data.fromAccountId.present
           ? data.fromAccountId.value
           : this.fromAccountId,
+      externalId: data.externalId.present
+          ? data.externalId.value
+          : this.externalId,
     );
   }
 
@@ -8547,7 +8591,8 @@ class Payment extends DataClass implements Insertable<Payment> {
           ..write('amountCents: $amountCents, ')
           ..write('date: $date, ')
           ..write('note: $note, ')
-          ..write('fromAccountId: $fromAccountId')
+          ..write('fromAccountId: $fromAccountId, ')
+          ..write('externalId: $externalId')
           ..write(')'))
         .toString();
   }
@@ -8562,6 +8607,7 @@ class Payment extends DataClass implements Insertable<Payment> {
     date,
     note,
     fromAccountId,
+    externalId,
   );
   @override
   bool operator ==(Object other) =>
@@ -8574,7 +8620,8 @@ class Payment extends DataClass implements Insertable<Payment> {
           other.amountCents == this.amountCents &&
           other.date == this.date &&
           other.note == this.note &&
-          other.fromAccountId == this.fromAccountId);
+          other.fromAccountId == this.fromAccountId &&
+          other.externalId == this.externalId);
 }
 
 class PaymentsCompanion extends UpdateCompanion<Payment> {
@@ -8586,6 +8633,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
   final Value<DateTime> date;
   final Value<String?> note;
   final Value<int?> fromAccountId;
+  final Value<String?> externalId;
   const PaymentsCompanion({
     this.id = const Value.absent(),
     this.profileId = const Value.absent(),
@@ -8595,6 +8643,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     this.date = const Value.absent(),
     this.note = const Value.absent(),
     this.fromAccountId = const Value.absent(),
+    this.externalId = const Value.absent(),
   });
   PaymentsCompanion.insert({
     this.id = const Value.absent(),
@@ -8605,6 +8654,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     required DateTime date,
     this.note = const Value.absent(),
     this.fromAccountId = const Value.absent(),
+    this.externalId = const Value.absent(),
   }) : profileId = Value(profileId),
        accountType = Value(accountType),
        accountId = Value(accountId),
@@ -8619,6 +8669,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     Expression<DateTime>? date,
     Expression<String>? note,
     Expression<int>? fromAccountId,
+    Expression<String>? externalId,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -8629,6 +8680,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
       if (date != null) 'date': date,
       if (note != null) 'note': note,
       if (fromAccountId != null) 'from_account_id': fromAccountId,
+      if (externalId != null) 'external_id': externalId,
     });
   }
 
@@ -8641,6 +8693,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     Value<DateTime>? date,
     Value<String?>? note,
     Value<int?>? fromAccountId,
+    Value<String?>? externalId,
   }) {
     return PaymentsCompanion(
       id: id ?? this.id,
@@ -8651,6 +8704,7 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
       date: date ?? this.date,
       note: note ?? this.note,
       fromAccountId: fromAccountId ?? this.fromAccountId,
+      externalId: externalId ?? this.externalId,
     );
   }
 
@@ -8683,6 +8737,9 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     if (fromAccountId.present) {
       map['from_account_id'] = Variable<int>(fromAccountId.value);
     }
+    if (externalId.present) {
+      map['external_id'] = Variable<String>(externalId.value);
+    }
     return map;
   }
 
@@ -8696,7 +8753,8 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
           ..write('amountCents: $amountCents, ')
           ..write('date: $date, ')
           ..write('note: $note, ')
-          ..write('fromAccountId: $fromAccountId')
+          ..write('fromAccountId: $fromAccountId, ')
+          ..write('externalId: $externalId')
           ..write(')'))
         .toString();
   }
@@ -11672,6 +11730,17 @@ class $TransferLogsTable extends TransferLogs
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _externalIdMeta = const VerificationMeta(
+    'externalId',
+  );
+  @override
+  late final GeneratedColumn<String> externalId = GeneratedColumn<String>(
+    'external_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -11679,6 +11748,7 @@ class $TransferLogsTable extends TransferLogs
     transferId,
     date,
     amountCents,
+    externalId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -11730,6 +11800,12 @@ class $TransferLogsTable extends TransferLogs
     } else if (isInserting) {
       context.missing(_amountCentsMeta);
     }
+    if (data.containsKey('external_id')) {
+      context.handle(
+        _externalIdMeta,
+        externalId.isAcceptableOrUnknown(data['external_id']!, _externalIdMeta),
+      );
+    }
     return context;
   }
 
@@ -11763,6 +11839,10 @@ class $TransferLogsTable extends TransferLogs
         DriftSqlType.int,
         data['${effectivePrefix}amount_cents'],
       )!,
+      externalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_id'],
+      ),
     );
   }
 
@@ -11778,12 +11858,18 @@ class TransferLog extends DataClass implements Insertable<TransferLog> {
   final int transferId;
   final DateTime date;
   final int amountCents;
+
+  /// The bank transactions this movement stands for, in the same form as
+  /// [Payments.externalId]. Empty for a transfer the person made or
+  /// scheduled until the bank reports it.
+  final String? externalId;
   const TransferLog({
     required this.id,
     required this.profileId,
     required this.transferId,
     required this.date,
     required this.amountCents,
+    this.externalId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -11793,6 +11879,9 @@ class TransferLog extends DataClass implements Insertable<TransferLog> {
     map['transfer_id'] = Variable<int>(transferId);
     map['date'] = Variable<DateTime>(date);
     map['amount_cents'] = Variable<int>(amountCents);
+    if (!nullToAbsent || externalId != null) {
+      map['external_id'] = Variable<String>(externalId);
+    }
     return map;
   }
 
@@ -11803,6 +11892,9 @@ class TransferLog extends DataClass implements Insertable<TransferLog> {
       transferId: Value(transferId),
       date: Value(date),
       amountCents: Value(amountCents),
+      externalId: externalId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(externalId),
     );
   }
 
@@ -11817,6 +11909,7 @@ class TransferLog extends DataClass implements Insertable<TransferLog> {
       transferId: serializer.fromJson<int>(json['transferId']),
       date: serializer.fromJson<DateTime>(json['date']),
       amountCents: serializer.fromJson<int>(json['amountCents']),
+      externalId: serializer.fromJson<String?>(json['externalId']),
     );
   }
   @override
@@ -11828,6 +11921,7 @@ class TransferLog extends DataClass implements Insertable<TransferLog> {
       'transferId': serializer.toJson<int>(transferId),
       'date': serializer.toJson<DateTime>(date),
       'amountCents': serializer.toJson<int>(amountCents),
+      'externalId': serializer.toJson<String?>(externalId),
     };
   }
 
@@ -11837,12 +11931,14 @@ class TransferLog extends DataClass implements Insertable<TransferLog> {
     int? transferId,
     DateTime? date,
     int? amountCents,
+    Value<String?> externalId = const Value.absent(),
   }) => TransferLog(
     id: id ?? this.id,
     profileId: profileId ?? this.profileId,
     transferId: transferId ?? this.transferId,
     date: date ?? this.date,
     amountCents: amountCents ?? this.amountCents,
+    externalId: externalId.present ? externalId.value : this.externalId,
   );
   TransferLog copyWithCompanion(TransferLogsCompanion data) {
     return TransferLog(
@@ -11855,6 +11951,9 @@ class TransferLog extends DataClass implements Insertable<TransferLog> {
       amountCents: data.amountCents.present
           ? data.amountCents.value
           : this.amountCents,
+      externalId: data.externalId.present
+          ? data.externalId.value
+          : this.externalId,
     );
   }
 
@@ -11865,13 +11964,15 @@ class TransferLog extends DataClass implements Insertable<TransferLog> {
           ..write('profileId: $profileId, ')
           ..write('transferId: $transferId, ')
           ..write('date: $date, ')
-          ..write('amountCents: $amountCents')
+          ..write('amountCents: $amountCents, ')
+          ..write('externalId: $externalId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, profileId, transferId, date, amountCents);
+  int get hashCode =>
+      Object.hash(id, profileId, transferId, date, amountCents, externalId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -11880,7 +11981,8 @@ class TransferLog extends DataClass implements Insertable<TransferLog> {
           other.profileId == this.profileId &&
           other.transferId == this.transferId &&
           other.date == this.date &&
-          other.amountCents == this.amountCents);
+          other.amountCents == this.amountCents &&
+          other.externalId == this.externalId);
 }
 
 class TransferLogsCompanion extends UpdateCompanion<TransferLog> {
@@ -11889,12 +11991,14 @@ class TransferLogsCompanion extends UpdateCompanion<TransferLog> {
   final Value<int> transferId;
   final Value<DateTime> date;
   final Value<int> amountCents;
+  final Value<String?> externalId;
   const TransferLogsCompanion({
     this.id = const Value.absent(),
     this.profileId = const Value.absent(),
     this.transferId = const Value.absent(),
     this.date = const Value.absent(),
     this.amountCents = const Value.absent(),
+    this.externalId = const Value.absent(),
   });
   TransferLogsCompanion.insert({
     this.id = const Value.absent(),
@@ -11902,6 +12006,7 @@ class TransferLogsCompanion extends UpdateCompanion<TransferLog> {
     required int transferId,
     required DateTime date,
     required int amountCents,
+    this.externalId = const Value.absent(),
   }) : profileId = Value(profileId),
        transferId = Value(transferId),
        date = Value(date),
@@ -11912,6 +12017,7 @@ class TransferLogsCompanion extends UpdateCompanion<TransferLog> {
     Expression<int>? transferId,
     Expression<DateTime>? date,
     Expression<int>? amountCents,
+    Expression<String>? externalId,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -11919,6 +12025,7 @@ class TransferLogsCompanion extends UpdateCompanion<TransferLog> {
       if (transferId != null) 'transfer_id': transferId,
       if (date != null) 'date': date,
       if (amountCents != null) 'amount_cents': amountCents,
+      if (externalId != null) 'external_id': externalId,
     });
   }
 
@@ -11928,6 +12035,7 @@ class TransferLogsCompanion extends UpdateCompanion<TransferLog> {
     Value<int>? transferId,
     Value<DateTime>? date,
     Value<int>? amountCents,
+    Value<String?>? externalId,
   }) {
     return TransferLogsCompanion(
       id: id ?? this.id,
@@ -11935,6 +12043,7 @@ class TransferLogsCompanion extends UpdateCompanion<TransferLog> {
       transferId: transferId ?? this.transferId,
       date: date ?? this.date,
       amountCents: amountCents ?? this.amountCents,
+      externalId: externalId ?? this.externalId,
     );
   }
 
@@ -11956,6 +12065,9 @@ class TransferLogsCompanion extends UpdateCompanion<TransferLog> {
     if (amountCents.present) {
       map['amount_cents'] = Variable<int>(amountCents.value);
     }
+    if (externalId.present) {
+      map['external_id'] = Variable<String>(externalId.value);
+    }
     return map;
   }
 
@@ -11966,7 +12078,8 @@ class TransferLogsCompanion extends UpdateCompanion<TransferLog> {
           ..write('profileId: $profileId, ')
           ..write('transferId: $transferId, ')
           ..write('date: $date, ')
-          ..write('amountCents: $amountCents')
+          ..write('amountCents: $amountCents, ')
+          ..write('externalId: $externalId')
           ..write(')'))
         .toString();
   }
@@ -25233,6 +25346,7 @@ typedef $$PaymentsTableCreateCompanionBuilder = PaymentsCompanion Function({
   required DateTime date,
   Value<String?> note,
   Value<int?> fromAccountId,
+  Value<String?> externalId,
 });
 typedef $$PaymentsTableUpdateCompanionBuilder = PaymentsCompanion Function({
   Value<int> id,
@@ -25243,6 +25357,7 @@ typedef $$PaymentsTableUpdateCompanionBuilder = PaymentsCompanion Function({
   Value<DateTime> date,
   Value<String?> note,
   Value<int?> fromAccountId,
+  Value<String?> externalId,
 });
 
 final class $$PaymentsTableReferences
@@ -25321,6 +25436,11 @@ class $$PaymentsTableFilterComposer
 
   ColumnFilters<String> get note => $composableBuilder(
     column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalId => $composableBuilder(
+    column: $table.externalId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -25410,6 +25530,11 @@ class $$PaymentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get externalId => $composableBuilder(
+    column: $table.externalId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ProfilesTableOrderingComposer get profileId {
     final $$ProfilesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -25488,6 +25613,11 @@ class $$PaymentsTableAnnotationComposer
 
   GeneratedColumn<String> get note =>
       $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<String> get externalId => $composableBuilder(
+    column: $table.externalId,
+    builder: (column) => column,
+  );
 
   $$ProfilesTableAnnotationComposer get profileId {
     final $$ProfilesTableAnnotationComposer composer = $composerBuilder(
@@ -25572,6 +25702,7 @@ class $$PaymentsTableTableManager
                 Value<DateTime> date = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<int?> fromAccountId = const Value.absent(),
+                Value<String?> externalId = const Value.absent(),
               }) => PaymentsCompanion(
                 id: id,
                 profileId: profileId,
@@ -25581,6 +25712,7 @@ class $$PaymentsTableTableManager
                 date: date,
                 note: note,
                 fromAccountId: fromAccountId,
+                externalId: externalId,
               ),
           createCompanionCallback:
               ({
@@ -25592,6 +25724,7 @@ class $$PaymentsTableTableManager
                 required DateTime date,
                 Value<String?> note = const Value.absent(),
                 Value<int?> fromAccountId = const Value.absent(),
+                Value<String?> externalId = const Value.absent(),
               }) => PaymentsCompanion.insert(
                 id: id,
                 profileId: profileId,
@@ -25601,6 +25734,7 @@ class $$PaymentsTableTableManager
                 date: date,
                 note: note,
                 fromAccountId: fromAccountId,
+                externalId: externalId,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -28843,6 +28977,7 @@ typedef $$TransferLogsTableCreateCompanionBuilder =
       required int transferId,
       required DateTime date,
       required int amountCents,
+      Value<String?> externalId,
     });
 typedef $$TransferLogsTableUpdateCompanionBuilder =
     TransferLogsCompanion Function({
@@ -28851,6 +28986,7 @@ typedef $$TransferLogsTableUpdateCompanionBuilder =
       Value<int> transferId,
       Value<DateTime> date,
       Value<int> amountCents,
+      Value<String?> externalId,
     });
 
 final class $$TransferLogsTableReferences
@@ -28914,6 +29050,11 @@ class $$TransferLogsTableFilterComposer
 
   ColumnFilters<int> get amountCents => $composableBuilder(
     column: $table.amountCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalId => $composableBuilder(
+    column: $table.externalId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -28988,6 +29129,11 @@ class $$TransferLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get externalId => $composableBuilder(
+    column: $table.externalId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ProfilesTableOrderingComposer get profileId {
     final $$ProfilesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -29052,6 +29198,11 @@ class $$TransferLogsTableAnnotationComposer
 
   GeneratedColumn<int> get amountCents => $composableBuilder(
     column: $table.amountCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get externalId => $composableBuilder(
+    column: $table.externalId,
     builder: (column) => column,
   );
 
@@ -29136,12 +29287,14 @@ class $$TransferLogsTableTableManager
                 Value<int> transferId = const Value.absent(),
                 Value<DateTime> date = const Value.absent(),
                 Value<int> amountCents = const Value.absent(),
+                Value<String?> externalId = const Value.absent(),
               }) => TransferLogsCompanion(
                 id: id,
                 profileId: profileId,
                 transferId: transferId,
                 date: date,
                 amountCents: amountCents,
+                externalId: externalId,
               ),
           createCompanionCallback:
               ({
@@ -29150,12 +29303,14 @@ class $$TransferLogsTableTableManager
                 required int transferId,
                 required DateTime date,
                 required int amountCents,
+                Value<String?> externalId = const Value.absent(),
               }) => TransferLogsCompanion.insert(
                 id: id,
                 profileId: profileId,
                 transferId: transferId,
                 date: date,
                 amountCents: amountCents,
+                externalId: externalId,
               ),
           withReferenceMapper: (p0) => p0
               .map(

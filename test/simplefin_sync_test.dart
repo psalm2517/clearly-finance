@@ -1588,4 +1588,193 @@ void main() {
       expect(BackupService(db).inspect(json).rowCounts['simpleFinSkipped'], 1);
     });
   });
+
+  group('a movement typed in by hand and the same one from the bank', () {
+    Future<({int chk, int card})> linkChkAndCard(
+        List<Map<String, Object?>> chkTxns,
+        List<Map<String, Object?>> cardTxns) async {
+      bridge.accounts = [
+        {'id': 'CHK', 'name': 'Checking (8841)', 'balance': '900.00', 'transactions': chkTxns},
+        {'id': 'CC', 'name': 'Visa (1111)', 'balance': '-300.00', 'transactions': cardTxns},
+      ];
+      await repo.connectSimpleFin(
+          profileId: profileId, setupToken: token(), client: client, now: now);
+      late int chk, card;
+      for (final f in await feed()) {
+        final id = await repo.createFromSimpleFinAccount(
+            profileId: profileId,
+            feedAccountId: f.id,
+            kind: f.name.startsWith('Visa') ? FeedTarget.card : FeedTarget.account);
+        if (f.name.startsWith('Visa')) {
+          card = id;
+        } else {
+          chk = id;
+        }
+      }
+      return (chk: chk, card: card);
+    }
+
+    Future<void> sync() => repo.syncSimpleFin(
+        profileId: profileId,
+        client: client,
+        now: now,
+        lookback: const Duration(days: 30));
+
+    test('a card payment typed in is the same one the bank reports, not a '
+        'second', () async {
+      final ids = await linkChkAndCard([
+        txn('o', '-100.00', 'Payment to Chase card ending in 1111',
+            posted: DateTime(2026, 6, 10)),
+      ], [
+        txn('i', '100.00', 'Payment Thank You', posted: DateTime(2026, 6, 11)),
+      ]);
+      await repo.addPayment(
+          profileId: profileId,
+          accountType: PaymentAccountType.card,
+          accountId: ids.card,
+          amountCents: 10000,
+          date: DateTime(2026, 6, 10),
+          fromAccountId: ids.chk);
+      await sync();
+
+      final payments = await db.select(db.payments).get();
+      expect(payments, hasLength(1));
+      expect(payments.single.externalId, allOf(contains(';OUT='), contains(';IN=')));
+      expect(await db.select(db.budgetEntries).get(), isEmpty);
+    });
+
+    test('a transfer typed in to a manual account is not also an expense',
+        () async {
+      bridge.accounts = [
+        {
+          'id': 'CHK',
+          'name': 'Checking',
+          'balance': '650.00',
+          'transactions': [
+            txn('o', '-250.00', 'Online Transfer to SAV', posted: DateTime(2026, 6, 10)),
+          ],
+        },
+      ];
+      await repo.connectSimpleFin(
+          profileId: profileId, setupToken: token(), client: client, now: now);
+      final chk = await repo.createFromSimpleFinAccount(
+          profileId: profileId,
+          feedAccountId: (await feed()).single.id,
+          kind: FeedTarget.account);
+      final jar = await repo.upsertAccount(AccountsCompanion.insert(
+          profileId: profileId, name: 'Savings jar', type: AccountType.savings));
+      await repo.postManualTransfer(
+          profileId: profileId,
+          fromAccountId: chk,
+          toAccountId: jar,
+          amountCents: 25000,
+          date: DateTime(2026, 6, 10),
+          name: 'To savings');
+      await sync();
+
+      expect(await db.select(db.budgetEntries).get(), isEmpty,
+          reason: 'the bank\'s side is the transfer, not spending');
+      final logs = await db.select(db.transferLogs).get();
+      expect(logs, hasLength(1));
+      expect(logs.single.externalId, startsWith(';OUT='));
+      final accounts = {
+        for (final a in await db.select(db.accounts).get()) a.id: a.balanceCents,
+      };
+      expect(accounts[jar], 25000, reason: 'moved once, by the transfer');
+      expect(accounts[chk], 65000, reason: 'the bank owns this balance');
+    });
+
+    test('a purchase of the same amount is not swallowed by a payment',
+        () async {
+      final ids = await linkChkAndCard([
+        txn('s', '-100.00', 'ACME HARDWARE STORE', posted: DateTime(2026, 6, 11)),
+      ], []);
+      await repo.addPayment(
+          profileId: profileId,
+          accountType: PaymentAccountType.card,
+          accountId: ids.card,
+          amountCents: 10000,
+          date: DateTime(2026, 6, 10),
+          fromAccountId: ids.chk);
+      await sync();
+      final entries = await db.select(db.budgetEntries).get();
+      expect(entries.single.description, 'ACME HARDWARE STORE');
+      expect((await db.select(db.payments).get()).single.externalId, isNull);
+    });
+
+    test('one payment stands for one withdrawal and one credit, no more',
+        () async {
+      final ids = await linkChkAndCard([
+        txn('a', '-50.00', 'ACH PMT 1', posted: DateTime(2026, 6, 10)),
+        txn('b', '-50.00', 'ACH PMT 2', posted: DateTime(2026, 6, 11)),
+      ], []);
+      await repo.addPayment(
+          profileId: profileId,
+          accountType: PaymentAccountType.card,
+          accountId: ids.card,
+          amountCents: 5000,
+          date: DateTime(2026, 6, 10),
+          fromAccountId: ids.chk);
+      await sync();
+      expect(await db.select(db.budgetEntries).get(), hasLength(1),
+          reason: 'the second withdrawal is something else');
+      expect(await db.select(db.payments).get(), hasLength(1));
+    });
+
+    test('a credit that arrives first and its withdrawal later are one '
+        'payment', () async {
+      final ids = await linkChkAndCard([], [
+        txn('i', '75.00', 'Payment Thank You', posted: DateTime(2026, 6, 11)),
+      ]);
+      await sync();
+      var payments = await db.select(db.payments).get();
+      expect(payments, hasLength(1));
+      expect(payments.single.fromAccountId, isNull);
+
+      (bridge.accounts.first['transactions'] as List).add(
+          txn('o', '-75.00', 'ACH PMT', posted: DateTime(2026, 6, 10)));
+      await sync();
+      payments = await db.select(db.payments).get();
+      expect(payments, hasLength(1));
+      expect(payments.single.fromAccountId, ids.chk);
+      expect(payments.single.externalId, allOf(contains(';OUT='), contains(';IN=')));
+      expect(await db.select(db.budgetEntries).get(), isEmpty);
+    });
+
+    test('a transfer the bank pairs counts toward an Invest target', () async {
+      await db.into(db.budgetTargets).insert(BudgetTargetsCompanion.insert(
+          profileId: profileId, category: 'Invest', monthlyTargetCents: 20000));
+      bridge.accounts = [
+        {
+          'id': 'CHK',
+          'name': 'Checking',
+          'balance': '800.00',
+          'transactions': [
+            txn('o', '-200.00', 'TRANSFER TO IRA', posted: DateTime(2026, 6, 10)),
+          ],
+        },
+        {
+          'id': 'IRA',
+          'name': 'IRA',
+          'balance': '5200.00',
+          'transactions': [
+            txn('i', '200.00', 'TRANSFER FROM CHK', posted: DateTime(2026, 6, 10)),
+          ],
+        },
+      ];
+      await repo.connectSimpleFin(
+          profileId: profileId, setupToken: token(), client: client, now: now);
+      for (final f in await feed()) {
+        await repo.createFromSimpleFinAccount(
+            profileId: profileId,
+            feedAccountId: f.id,
+            kind: FeedTarget.account,
+            accountType:
+                f.name == 'IRA' ? AccountType.retirement : AccountType.checking);
+      }
+      await sync();
+      final t = (await db.select(db.recurringTransfers).get()).single;
+      expect(t.targetCategory, 'Invest');
+    });
+  });
 }

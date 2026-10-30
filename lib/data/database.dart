@@ -87,6 +87,14 @@ class Payments extends Table {
   /// setting it also deducts the amount from that account's balance.
   IntColumn get fromAccountId =>
       integer().nullable().references(Accounts, #id)();
+
+  /// Which bank transactions this payment stands for, once any has been
+  /// matched to it: `;OUT=<id>` for the withdrawal from the paying account,
+  /// `;IN=<id>` for the credit on the card, or both. A payment typed in by
+  /// hand has none until the bank reports it, and then the bank's
+  /// transactions are folded into it instead of being counted beside it.
+  /// `legacy` marks one made from the bank before this was recorded.
+  TextColumn get externalId => text().nullable()();
 }
 
 /// Point-in-time record of net worth, so the trend can be charted. Written
@@ -531,6 +539,11 @@ class TransferLogs extends Table {
   DateTimeColumn get date => dateTime()();
   IntColumn get amountCents => integer()();
 
+  /// The bank transactions this movement stands for, in the same form as
+  /// [Payments.externalId]. Empty for a transfer the person made or
+  /// scheduled until the bank reports it.
+  TextColumn get externalId => text().nullable()();
+
   @override
   List<Set<Column>> get uniqueKeys => [
         {transferId, date},
@@ -836,6 +849,46 @@ class AppDatabase extends _$AppDatabase {
             final has = cols.any((r) => r.read<String>('name') == 'payment_due_day');
             if (cols.isNotEmpty && !has) {
               await m.addColumn(loans, loans.paymentDueDay);
+            }
+
+            Future<bool> hasColumn(String table, String column) async {
+              final c = await customSelect('PRAGMA table_info($table)').get();
+              return c.isNotEmpty &&
+                  c.any((r) => r.read<String>('name') == column);
+            }
+
+            Future<bool> hasTable(String table) async => (await customSelect(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                    variables: [Variable.withString(table)])
+                .get())
+                .isNotEmpty;
+
+            if (await hasTable('payments') &&
+                !await hasColumn('payments', 'external_id')) {
+              await m.addColumn(payments, payments.externalId);
+            }
+            if (await hasTable('transfer_logs') &&
+                !await hasColumn('transfer_logs', 'external_id')) {
+              await m.addColumn(transferLogs, transferLogs.externalId);
+            }
+            // What the bank already made into movements is marked so a
+            // new bank transaction is not folded into it by mistake.
+            if (await hasTable('payments') &&
+                await hasColumn('payments', 'note')) {
+              await customStatement(
+                  "UPDATE payments SET external_id = 'legacy' "
+                  "WHERE note = 'Matched from your bank'");
+            }
+            if (await hasTable('simple_fin_feed_accounts') &&
+                await hasTable('transfer_logs') &&
+                await hasTable('recurring_transfers')) {
+              const linked = "SELECT target_id FROM simple_fin_feed_accounts "
+                  "WHERE target = 'account' AND target_id IS NOT NULL";
+              await customStatement(
+                  "UPDATE transfer_logs SET external_id = 'legacy' "
+                  'WHERE transfer_id IN (SELECT id FROM recurring_transfers '
+                  'WHERE from_account_id IN ($linked) '
+                  'AND to_account_id IN ($linked))');
             }
           }
         },

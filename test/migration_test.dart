@@ -1083,4 +1083,84 @@ void main() {
     expect(loan.name, 'Car');
     expect(loan.paymentDueDay, isNull);
   });
+
+  test('a v25 database marks the movements the bank already made, so new '
+      'bank transactions are not folded into them', () async {
+    final dir = Directory.systemTemp.createTempSync('homebase_v25b');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final f = File('${dir.path}/homebase.sqlite');
+
+    var db = AppDatabase.forTesting(NativeDatabase(f));
+    final repo = HomebaseRepository(db);
+    final profile = await repo.createProfile(
+        ProfilesCompanion.insert(name: 'Owner', isAdmin: const Value(true)));
+    final a = await repo.upsertAccount(AccountsCompanion.insert(
+        profileId: profile, name: 'A', type: AccountType.checking));
+    final b = await repo.upsertAccount(AccountsCompanion.insert(
+        profileId: profile, name: 'B', type: AccountType.savings));
+    final c = await repo.upsertAccount(AccountsCompanion.insert(
+        profileId: profile, name: 'C', type: AccountType.cash));
+    final card = await repo.upsertCard(CreditCardsCompanion.insert(
+        profileId: profile, name: 'Visa', creditLimitCents: 100000));
+    final conn = await db.into(db.simpleFinConnections).insert(
+        SimpleFinConnectionsCompanion.insert(
+            profileId: profile,
+            accessUrl: 'https://u:p@bridge.test/x',
+            createdAt: DateTime(2026, 1, 1)));
+    for (final (remote, id) in [('A', a), ('B', b)]) {
+      await db.into(db.simpleFinFeedAccounts).insert(
+          SimpleFinFeedAccountsCompanion.insert(
+              connectionId: conn,
+              remoteId: remote,
+              name: remote,
+              target: const Value(FeedTarget.account),
+              targetId: Value(id)));
+    }
+    await repo.postManualTransfer(
+        profileId: profile,
+        fromAccountId: a,
+        toAccountId: b,
+        amountCents: 1000,
+        date: DateTime(2026, 8, 1),
+        name: 'Both synced');
+    await repo.postManualTransfer(
+        profileId: profile,
+        fromAccountId: a,
+        toAccountId: c,
+        amountCents: 2000,
+        date: DateTime(2026, 8, 2),
+        name: 'One manual');
+    await repo.addPayment(
+        profileId: profile,
+        accountType: PaymentAccountType.card,
+        accountId: card,
+        amountCents: 3000,
+        date: DateTime(2026, 8, 3),
+        note: 'Matched from your bank');
+    await repo.addPayment(
+        profileId: profile,
+        accountType: PaymentAccountType.card,
+        accountId: card,
+        amountCents: 4000,
+        date: DateTime(2026, 8, 4),
+        note: 'Mine');
+    await db.close();
+
+    final raw = sqlite3.open(f.path);
+    raw.execute('ALTER TABLE payments DROP COLUMN external_id;');
+    raw.execute('ALTER TABLE transfer_logs DROP COLUMN external_id;');
+    raw.execute('PRAGMA user_version = 25;');
+    raw.close();
+
+    db = AppDatabase.forTesting(NativeDatabase(f));
+    addTearDown(db.close);
+    final logs = await db.select(db.transferLogs).get();
+    expect(logs.firstWhere((l) => l.amountCents == 1000).externalId, 'legacy');
+    expect(logs.firstWhere((l) => l.amountCents == 2000).externalId, isNull);
+    final payments = await db.select(db.payments).get();
+    expect(payments.firstWhere((p) => p.amountCents == 3000).externalId,
+        'legacy');
+    expect(payments.firstWhere((p) => p.amountCents == 4000).externalId,
+        isNull);
+  });
 }
