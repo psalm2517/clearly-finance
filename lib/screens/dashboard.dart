@@ -1235,6 +1235,10 @@ class _NextTwoWeeksCard extends ConsumerWidget {
                                   UpcomingKind.transfer =>
                                     Icons.sync_alt_outlined,
                                   UpcomingKind.recurring => Icons.autorenew,
+                                  UpcomingKind.cardPayment => Icons.credit_card,
+                                  UpcomingKind.loanPayment =>
+                                    Icons.request_quote_outlined,
+                                  UpcomingKind.annualFee => Icons.event_repeat,
                                 },
                                 color: item.amountCents >= 0
                                     ? scheme.primary

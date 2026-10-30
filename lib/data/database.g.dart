@@ -1692,6 +1692,17 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _paymentDueDayMeta = const VerificationMeta(
+    'paymentDueDay',
+  );
+  @override
+  late final GeneratedColumn<int> paymentDueDay = GeneratedColumn<int>(
+    'payment_due_day',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1701,6 +1712,7 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
     originalAmountCents,
     apr,
     monthlyPaymentCents,
+    paymentDueDay,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1770,6 +1782,15 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
         ),
       );
     }
+    if (data.containsKey('payment_due_day')) {
+      context.handle(
+        _paymentDueDayMeta,
+        paymentDueDay.isAcceptableOrUnknown(
+          data['payment_due_day']!,
+          _paymentDueDayMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1807,6 +1828,10 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
         DriftSqlType.int,
         data['${effectivePrefix}monthly_payment_cents'],
       )!,
+      paymentDueDay: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}payment_due_day'],
+      ),
     );
   }
 
@@ -1824,6 +1849,11 @@ class Loan extends DataClass implements Insertable<Loan> {
   final int originalAmountCents;
   final double apr;
   final int monthlyPaymentCents;
+
+  /// Day of the month the payment is due, when the person has said. Until
+  /// they do, a loan has no due date at all: nothing is assumed, so it is
+  /// never reminded about on a date that was made up.
+  final int? paymentDueDay;
   const Loan({
     required this.id,
     required this.profileId,
@@ -1832,6 +1862,7 @@ class Loan extends DataClass implements Insertable<Loan> {
     required this.originalAmountCents,
     required this.apr,
     required this.monthlyPaymentCents,
+    this.paymentDueDay,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1843,6 +1874,9 @@ class Loan extends DataClass implements Insertable<Loan> {
     map['original_amount_cents'] = Variable<int>(originalAmountCents);
     map['apr'] = Variable<double>(apr);
     map['monthly_payment_cents'] = Variable<int>(monthlyPaymentCents);
+    if (!nullToAbsent || paymentDueDay != null) {
+      map['payment_due_day'] = Variable<int>(paymentDueDay);
+    }
     return map;
   }
 
@@ -1855,6 +1889,9 @@ class Loan extends DataClass implements Insertable<Loan> {
       originalAmountCents: Value(originalAmountCents),
       apr: Value(apr),
       monthlyPaymentCents: Value(monthlyPaymentCents),
+      paymentDueDay: paymentDueDay == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentDueDay),
     );
   }
 
@@ -1875,6 +1912,7 @@ class Loan extends DataClass implements Insertable<Loan> {
       monthlyPaymentCents: serializer.fromJson<int>(
         json['monthlyPaymentCents'],
       ),
+      paymentDueDay: serializer.fromJson<int?>(json['paymentDueDay']),
     );
   }
   @override
@@ -1888,6 +1926,7 @@ class Loan extends DataClass implements Insertable<Loan> {
       'originalAmountCents': serializer.toJson<int>(originalAmountCents),
       'apr': serializer.toJson<double>(apr),
       'monthlyPaymentCents': serializer.toJson<int>(monthlyPaymentCents),
+      'paymentDueDay': serializer.toJson<int?>(paymentDueDay),
     };
   }
 
@@ -1899,6 +1938,7 @@ class Loan extends DataClass implements Insertable<Loan> {
     int? originalAmountCents,
     double? apr,
     int? monthlyPaymentCents,
+    Value<int?> paymentDueDay = const Value.absent(),
   }) => Loan(
     id: id ?? this.id,
     profileId: profileId ?? this.profileId,
@@ -1907,6 +1947,9 @@ class Loan extends DataClass implements Insertable<Loan> {
     originalAmountCents: originalAmountCents ?? this.originalAmountCents,
     apr: apr ?? this.apr,
     monthlyPaymentCents: monthlyPaymentCents ?? this.monthlyPaymentCents,
+    paymentDueDay: paymentDueDay.present
+        ? paymentDueDay.value
+        : this.paymentDueDay,
   );
   Loan copyWithCompanion(LoansCompanion data) {
     return Loan(
@@ -1923,6 +1966,9 @@ class Loan extends DataClass implements Insertable<Loan> {
       monthlyPaymentCents: data.monthlyPaymentCents.present
           ? data.monthlyPaymentCents.value
           : this.monthlyPaymentCents,
+      paymentDueDay: data.paymentDueDay.present
+          ? data.paymentDueDay.value
+          : this.paymentDueDay,
     );
   }
 
@@ -1935,7 +1981,8 @@ class Loan extends DataClass implements Insertable<Loan> {
           ..write('balanceCents: $balanceCents, ')
           ..write('originalAmountCents: $originalAmountCents, ')
           ..write('apr: $apr, ')
-          ..write('monthlyPaymentCents: $monthlyPaymentCents')
+          ..write('monthlyPaymentCents: $monthlyPaymentCents, ')
+          ..write('paymentDueDay: $paymentDueDay')
           ..write(')'))
         .toString();
   }
@@ -1949,6 +1996,7 @@ class Loan extends DataClass implements Insertable<Loan> {
     originalAmountCents,
     apr,
     monthlyPaymentCents,
+    paymentDueDay,
   );
   @override
   bool operator ==(Object other) =>
@@ -1960,7 +2008,8 @@ class Loan extends DataClass implements Insertable<Loan> {
           other.balanceCents == this.balanceCents &&
           other.originalAmountCents == this.originalAmountCents &&
           other.apr == this.apr &&
-          other.monthlyPaymentCents == this.monthlyPaymentCents);
+          other.monthlyPaymentCents == this.monthlyPaymentCents &&
+          other.paymentDueDay == this.paymentDueDay);
 }
 
 class LoansCompanion extends UpdateCompanion<Loan> {
@@ -1971,6 +2020,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
   final Value<int> originalAmountCents;
   final Value<double> apr;
   final Value<int> monthlyPaymentCents;
+  final Value<int?> paymentDueDay;
   const LoansCompanion({
     this.id = const Value.absent(),
     this.profileId = const Value.absent(),
@@ -1979,6 +2029,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     this.originalAmountCents = const Value.absent(),
     this.apr = const Value.absent(),
     this.monthlyPaymentCents = const Value.absent(),
+    this.paymentDueDay = const Value.absent(),
   });
   LoansCompanion.insert({
     this.id = const Value.absent(),
@@ -1988,6 +2039,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     required int originalAmountCents,
     this.apr = const Value.absent(),
     this.monthlyPaymentCents = const Value.absent(),
+    this.paymentDueDay = const Value.absent(),
   }) : profileId = Value(profileId),
        name = Value(name),
        balanceCents = Value(balanceCents),
@@ -2000,6 +2052,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     Expression<int>? originalAmountCents,
     Expression<double>? apr,
     Expression<int>? monthlyPaymentCents,
+    Expression<int>? paymentDueDay,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2011,6 +2064,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
       if (apr != null) 'apr': apr,
       if (monthlyPaymentCents != null)
         'monthly_payment_cents': monthlyPaymentCents,
+      if (paymentDueDay != null) 'payment_due_day': paymentDueDay,
     });
   }
 
@@ -2022,6 +2076,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     Value<int>? originalAmountCents,
     Value<double>? apr,
     Value<int>? monthlyPaymentCents,
+    Value<int?>? paymentDueDay,
   }) {
     return LoansCompanion(
       id: id ?? this.id,
@@ -2031,6 +2086,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
       originalAmountCents: originalAmountCents ?? this.originalAmountCents,
       apr: apr ?? this.apr,
       monthlyPaymentCents: monthlyPaymentCents ?? this.monthlyPaymentCents,
+      paymentDueDay: paymentDueDay ?? this.paymentDueDay,
     );
   }
 
@@ -2058,6 +2114,9 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     if (monthlyPaymentCents.present) {
       map['monthly_payment_cents'] = Variable<int>(monthlyPaymentCents.value);
     }
+    if (paymentDueDay.present) {
+      map['payment_due_day'] = Variable<int>(paymentDueDay.value);
+    }
     return map;
   }
 
@@ -2070,7 +2129,8 @@ class LoansCompanion extends UpdateCompanion<Loan> {
           ..write('balanceCents: $balanceCents, ')
           ..write('originalAmountCents: $originalAmountCents, ')
           ..write('apr: $apr, ')
-          ..write('monthlyPaymentCents: $monthlyPaymentCents')
+          ..write('monthlyPaymentCents: $monthlyPaymentCents, ')
+          ..write('paymentDueDay: $paymentDueDay')
           ..write(')'))
         .toString();
   }
@@ -18200,6 +18260,7 @@ typedef $$LoansTableCreateCompanionBuilder = LoansCompanion Function({
   required int originalAmountCents,
   Value<double> apr,
   Value<int> monthlyPaymentCents,
+  Value<int?> paymentDueDay,
 });
 typedef $$LoansTableUpdateCompanionBuilder = LoansCompanion Function({
   Value<int> id,
@@ -18209,6 +18270,7 @@ typedef $$LoansTableUpdateCompanionBuilder = LoansCompanion Function({
   Value<int> originalAmountCents,
   Value<double> apr,
   Value<int> monthlyPaymentCents,
+  Value<int?> paymentDueDay,
 });
 
 final class $$LoansTableReferences
@@ -18268,6 +18330,11 @@ class $$LoansTableFilterComposer extends Composer<_$AppDatabase, $LoansTable> {
 
   ColumnFilters<int> get monthlyPaymentCents => $composableBuilder(
     column: $table.monthlyPaymentCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get paymentDueDay => $composableBuilder(
+    column: $table.paymentDueDay,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -18334,6 +18401,11 @@ class $$LoansTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get paymentDueDay => $composableBuilder(
+    column: $table.paymentDueDay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ProfilesTableOrderingComposer get profileId {
     final $$ProfilesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -18388,6 +18460,11 @@ class $$LoansTableAnnotationComposer
 
   GeneratedColumn<int> get monthlyPaymentCents => $composableBuilder(
     column: $table.monthlyPaymentCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get paymentDueDay => $composableBuilder(
+    column: $table.paymentDueDay,
     builder: (column) => column,
   );
 
@@ -18450,6 +18527,7 @@ class $$LoansTableTableManager
                 Value<int> originalAmountCents = const Value.absent(),
                 Value<double> apr = const Value.absent(),
                 Value<int> monthlyPaymentCents = const Value.absent(),
+                Value<int?> paymentDueDay = const Value.absent(),
               }) => LoansCompanion(
                 id: id,
                 profileId: profileId,
@@ -18458,6 +18536,7 @@ class $$LoansTableTableManager
                 originalAmountCents: originalAmountCents,
                 apr: apr,
                 monthlyPaymentCents: monthlyPaymentCents,
+                paymentDueDay: paymentDueDay,
               ),
           createCompanionCallback:
               ({
@@ -18468,6 +18547,7 @@ class $$LoansTableTableManager
                 required int originalAmountCents,
                 Value<double> apr = const Value.absent(),
                 Value<int> monthlyPaymentCents = const Value.absent(),
+                Value<int?> paymentDueDay = const Value.absent(),
               }) => LoansCompanion.insert(
                 id: id,
                 profileId: profileId,
@@ -18476,6 +18556,7 @@ class $$LoansTableTableManager
                 originalAmountCents: originalAmountCents,
                 apr: apr,
                 monthlyPaymentCents: monthlyPaymentCents,
+                paymentDueDay: paymentDueDay,
               ),
           withReferenceMapper: (p0) => p0
               .map(

@@ -151,6 +151,11 @@ class Loans extends Table {
   IntColumn get originalAmountCents => integer()();
   RealColumn get apr => real().withDefault(const Constant(0))();
   IntColumn get monthlyPaymentCents => integer().withDefault(const Constant(0))();
+
+  /// Day of the month the payment is due, when the person has said. Until
+  /// they do, a loan has no due date at all: nothing is assumed, so it is
+  /// never reminded about on a date that was made up.
+  IntColumn get paymentDueDay => integer().nullable()();
 }
 
 /// How often a bill comes due.
@@ -616,7 +621,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 25;
+  int get schemaVersion => 26;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -823,6 +828,15 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 25) {
             await m.createTable(simpleFinSkipped);
+          }
+          if (from < 26) {
+            // Only where the column is missing: a fresh createTable above
+            // already uses the current columns.
+            final cols = await customSelect('PRAGMA table_info(loans)').get();
+            final has = cols.any((r) => r.read<String>('name') == 'payment_due_day');
+            if (cols.isNotEmpty && !has) {
+              await m.addColumn(loans, loans.paymentDueDay);
+            }
           }
         },
         beforeOpen: (details) async {

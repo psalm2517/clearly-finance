@@ -11,6 +11,9 @@ IconData _kindIcon(UpcomingKind kind) => switch (kind) {
       UpcomingKind.paycheck => Icons.payments_outlined,
       UpcomingKind.transfer => Icons.sync_alt_outlined,
       UpcomingKind.recurring => Icons.autorenew,
+      UpcomingKind.cardPayment => Icons.credit_card,
+      UpcomingKind.loanPayment => Icons.request_quote_outlined,
+      UpcomingKind.annualFee => Icons.event_repeat,
     };
 
 String _kindLabel(UpcomingKind kind) => switch (kind) {
@@ -18,6 +21,9 @@ String _kindLabel(UpcomingKind kind) => switch (kind) {
       UpcomingKind.paycheck => 'Paycheck',
       UpcomingKind.transfer => 'Transfer',
       UpcomingKind.recurring => 'Recurring',
+      UpcomingKind.cardPayment => 'Card payment',
+      UpcomingKind.loanPayment => 'Loan payment',
+      UpcomingKind.annualFee => 'Annual fee',
     };
 
 /// Everything Clearly already knows is coming — bills, paychecks,

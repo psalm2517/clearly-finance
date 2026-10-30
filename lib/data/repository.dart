@@ -42,7 +42,15 @@ typedef Movement = ({
 });
 
 /// One kind of source feeding [HomebaseRepository.upcomingItems].
-enum UpcomingKind { bill, paycheck, transfer, recurring }
+enum UpcomingKind {
+  bill,
+  paycheck,
+  transfer,
+  recurring,
+  cardPayment,
+  loanPayment,
+  annualFee,
+}
 
 /// One future occurrence known ahead of time — a bill coming due, a
 /// paycheck landing, a scheduled transfer, or a general recurring
@@ -1219,8 +1227,11 @@ class HomebaseRepository {
     final loans = await watchLoans(profileId: profileId).first;
     for (final loan in loans) {
       if (loan.balanceCents <= 0 || loan.monthlyPaymentCents <= 0) continue;
-      // Loans have no explicit due day, so treat the 1st as the usual date.
-      final due = nextOccurrence(1, today);
+      // Only on the day the person gave. A loan with no due day has no due
+      // date, and is not reminded about on one that was guessed.
+      final dueDay = loan.paymentDueDay;
+      if (dueDay == null) continue;
+      final due = nextOccurrence(dueDay, today);
       if (due.isAfter(horizon)) continue;
       reminders.add(
         Reminder(
@@ -3559,6 +3570,60 @@ class HomebaseRepository {
         ));
       }
       month = DateTime(month.year, month.month + 1);
+    }
+
+    // Card payments, loan payments and annual fees: the same things the
+    // reminders panel shows, from the same rules, so the two never disagree
+    // about what is coming up.
+    final cardRows = await watchCards(profileId: profileId).first;
+    for (final card in cardRows) {
+      final dueDay = card.paymentDueDay;
+      if (dueDay != null && card.balanceCents > 0) {
+        var m = DateTime(today.year, today.month);
+        while (!m.isAfter(end)) {
+          final date = dayInMonth(m.year, m.month, dueDay);
+          if (inWindow(date)) {
+            items.add((
+              date: date,
+              label: '${card.name} payment',
+              amountCents: -card.balanceCents,
+              kind: UpcomingKind.cardPayment,
+            ));
+          }
+          m = DateTime(m.year, m.month + 1);
+        }
+      }
+      final feeDate = nextAnnualFeeDate(card, now: today);
+      if (feeDate != null && card.annualFeeCents > 0 && inWindow(feeDate)) {
+        items.add((
+          date: feeDate,
+          label: '${card.name} annual fee',
+          amountCents: -card.annualFeeCents,
+          kind: UpcomingKind.annualFee,
+        ));
+      }
+    }
+    final loanRows = await watchLoans(profileId: profileId).first;
+    for (final loan in loanRows) {
+      final dueDay = loan.paymentDueDay;
+      if (dueDay == null ||
+          loan.balanceCents <= 0 ||
+          loan.monthlyPaymentCents <= 0) {
+        continue;
+      }
+      var m = DateTime(today.year, today.month);
+      while (!m.isAfter(end)) {
+        final date = dayInMonth(m.year, m.month, dueDay);
+        if (inWindow(date)) {
+          items.add((
+            date: date,
+            label: '${loan.name} payment',
+            amountCents: -loan.monthlyPaymentCents,
+            kind: UpcomingKind.loanPayment,
+          ));
+        }
+        m = DateTime(m.year, m.month + 1);
+      }
     }
 
     final paychecks = await watchPaychecks(profileId: profileId).first;

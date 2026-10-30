@@ -1054,4 +1054,33 @@ void main() {
     expect(await db.select(db.simpleFinSkipped).get(), isEmpty);
     expect(await db.select(db.profiles).get(), hasLength(1));
   });
+
+  test('a v25 database gains an optional loan due day, and keeps its loans',
+      () async {
+    final dir = Directory.systemTemp.createTempSync('homebase_v25');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final f = File('${dir.path}/homebase.sqlite');
+
+    var db = AppDatabase.forTesting(NativeDatabase(f));
+    final repo = HomebaseRepository(db);
+    final profile = await repo.createProfile(
+        ProfilesCompanion.insert(name: 'Owner', isAdmin: const Value(true)));
+    await repo.upsertLoan(LoansCompanion.insert(
+        profileId: profile,
+        name: 'Car',
+        balanceCents: 100000,
+        originalAmountCents: 200000));
+    await db.close();
+
+    final raw = sqlite3.open(f.path);
+    raw.execute('ALTER TABLE loans DROP COLUMN payment_due_day;');
+    raw.execute('PRAGMA user_version = 25;');
+    raw.close();
+
+    db = AppDatabase.forTesting(NativeDatabase(f));
+    addTearDown(db.close);
+    final loan = await db.select(db.loans).getSingle();
+    expect(loan.name, 'Car');
+    expect(loan.paymentDueDay, isNull);
+  });
 }

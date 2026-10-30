@@ -189,6 +189,9 @@ class LoansScreen extends ConsumerWidget {
           ? ''
           : (existing.monthlyPaymentCents / 100).toString(),
     );
+    final dueDay = TextEditingController(
+      text: existing?.paymentDueDay?.toString() ?? '',
+    );
 
     final saved = await showDialog<bool>(
       context: context,
@@ -213,6 +216,12 @@ class LoansScreen extends ConsumerWidget {
                 DialogField(original, 'Original amount (\$)'),
                 DialogField(apr, 'APR (%)'),
                 DialogField(payment, 'Monthly payment (\$)'),
+                DialogField(
+                  dueDay,
+                  'Payment due day (optional)',
+                  helper: 'Day of the month, 1 to 31. Without it Clearly '
+                      'does not remind you about this loan.',
+                ),
               ],
             ),
           ),
@@ -245,6 +254,10 @@ class LoansScreen extends ConsumerWidget {
             originalAmountCents: Value(parseDollarsToCents(original.text) ?? 0),
             apr: Value(double.tryParse(apr.text) ?? 0),
             monthlyPaymentCents: Value(parseDollarsToCents(payment.text) ?? 0),
+            paymentDueDay: Value(() {
+              final d = int.tryParse(dueDay.text.trim());
+              return d == null || d < 1 || d > 31 ? null : d;
+            }()),
           ),
         );
   }
