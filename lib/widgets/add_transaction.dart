@@ -30,6 +30,15 @@ Future<void> showAddTransaction(
   final cards = await repo.watchCards(profileId: profileId).first;
   final loans = await repo.watchLoans(profileId: profileId).first;
   final targets = await repo.watchBudgetTargets(profileId: profileId).first;
+  final feed = await repo.watchSimpleFinFeedAccounts(profileId: profileId).first;
+  final syncedAccountIds = {
+    for (final f in feed)
+      if (f.target == FeedTarget.account && f.targetId != null) f.targetId!,
+  };
+  final syncedCardIds = {
+    for (final f in feed)
+      if (f.target == FeedTarget.card && f.targetId != null) f.targetId!,
+  };
   var splits = <TransactionSplit>[];
   var tags = <String>[];
   if (existing != null) {
@@ -48,6 +57,8 @@ Future<void> showAddTransaction(
       cards: cards,
       loans: loans,
       targetCategories: [for (final t in targets) t.category],
+      syncedAccountIds: syncedAccountIds,
+      syncedCardIds: syncedCardIds,
       existing: existing,
       existingSplits: splits,
       existingTags: tags,
@@ -79,6 +90,8 @@ class _AddTransactionDialog extends StatefulWidget {
     required this.cards,
     required this.loans,
     required this.targetCategories,
+    required this.syncedAccountIds,
+    required this.syncedCardIds,
     required this.existing,
     required this.existingSplits,
     required this.existingTags,
@@ -91,6 +104,10 @@ class _AddTransactionDialog extends StatefulWidget {
   final List<CreditCard> cards;
   final List<Loan> loans;
   final List<String> targetCategories;
+
+  /// Accounts and cards that Clearly Sync supplies the transactions for.
+  final Set<int> syncedAccountIds;
+  final Set<int> syncedCardIds;
   final BudgetEntry? existing;
   final List<TransactionSplit> existingSplits;
   final List<String> existingTags;
@@ -129,6 +146,11 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
       <({TextEditingController category, TextEditingController amount})>[];
 
   bool get _editing => widget.existing != null;
+
+  /// A transaction that came from the bank: what happened (amount, direction,
+  /// date, account) is the bank's. Only how it is described and sorted can be
+  /// changed.
+  bool get _locked => widget.existing?.externalId != null;
   DateTime get _today {
     final n = DateTime.now();
     return DateTime(n.year, n.month, n.day);
@@ -360,11 +382,11 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
     if (picked != null) setState(() => _date = picked);
   }
 
-  Widget _accountItemRow(Account a) => Row(children: [
+  Widget _accountItemRow(Account a, {bool synced = false}) => Row(children: [
         Icon(accountIcon(a.type),
             size: 16, color: accountTypeColor(context, a.type)),
         const SizedBox(width: 8),
-        Text(a.name),
+        Text(synced ? '${a.name} · synced' : a.name),
       ]);
 
   @override
@@ -377,6 +399,8 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
     final entryAccounts = _cashAccounts;
     final entryCards =
         _kind == DraftKind.income && _repeats ? <CreditCard>[] : widget.cards;
+    // A new one-off entry cannot go on a synced account or card.
+    final blockSynced = !_editing && !_repeats;
 
     return SubmitOnEnter(
       onSubmit: _save,
@@ -395,7 +419,8 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                         value: DraftKind.income, label: Text('Income')),
                   ],
                   selected: {_kind},
-                  onSelectionChanged: (s) => _setKind(s.first),
+                  onSelectionChanged:
+                      _locked ? null : (s) => _setKind(s.first),
                 )
               else
                 SegmentedButton<DraftKind>(
@@ -419,10 +444,16 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                   child: TextField(
                     controller: _amount,
                     autofocus: true,
+                    enabled: !_locked,
                     onChanged: (_) => setState(() => _error = null),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                         labelText: 'Amount (\$)',
-                        border: OutlineInputBorder()),
+                        helperText: _locked
+                            ? 'From your bank, so the amount, date and '
+                                'account cannot be changed.'
+                            : null,
+                        helperMaxLines: 2,
+                        border: const OutlineInputBorder()),
                   ),
                 ),
                 if (_kind == DraftKind.payment && _payable != null) ...[
@@ -577,7 +608,12 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                         labelText: _kind == DraftKind.income
                             ? 'Deposited to (optional)'
                             : 'Paid from (optional)',
-                        helperText: 'Linking one moves its balance',
+                        helperText: blockSynced &&
+                                (widget.syncedAccountIds.isNotEmpty ||
+                                    widget.syncedCardIds.isNotEmpty)
+                            ? 'Synced accounts get their transactions from '
+                                'your bank'
+                            : 'Linking one moves its balance',
                         border: const OutlineInputBorder()),
                     items: [
                       const DropdownMenuItem(
@@ -585,18 +621,30 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                       for (final a in entryAccounts)
                         DropdownMenuItem(
                             value: 'account:${a.id}',
-                            child: _accountItemRow(a)),
+                            // A new one-off entry on a synced account would be
+                            // a second copy of what the bank supplies.
+                            enabled: !(blockSynced &&
+                                widget.syncedAccountIds.contains(a.id)),
+                            child: _accountItemRow(a,
+                                synced: blockSynced &&
+                                    widget.syncedAccountIds.contains(a.id))),
                       for (final c in entryCards)
                         DropdownMenuItem(
                           value: 'card:${c.id}',
+                          enabled: !(blockSynced &&
+                              widget.syncedCardIds.contains(c.id)),
                           child: Row(children: [
                             const Icon(Icons.credit_card, size: 16),
                             const SizedBox(width: 8),
-                            Text(c.name),
+                            Text(blockSynced &&
+                                    widget.syncedCardIds.contains(c.id)
+                                ? '${c.name} · synced'
+                                : c.name),
                           ]),
                         ),
                     ],
-                    onChanged: (v) => setState(() => _source = v),
+                    onChanged:
+                        _locked ? null : (v) => setState(() => _source = v),
                   ),
                 ],
               ],
@@ -734,7 +782,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                   label: Text(_repeats
                       ? 'Starts ${_fmtDate(_date)}'
                       : _fmtDate(_date)),
-                  onPressed: _pickDate,
+                  onPressed: _locked ? null : _pickDate,
                 ),
               ),
               if (_canRepeat) ...[

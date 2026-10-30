@@ -1155,13 +1155,16 @@ void main() {
           type: AccountType.cash,
           balanceCents: const Value(10000)));
 
+      // What Clearly does by itself (a paycheck landing on payday) waits for
+      // the bank when no account is named.
       await repo.upsertPaycheck(PaychecksCompanion.insert(
         profileId: profileId,
         name: 'No account',
         date: DateTime(2026, 6, 1),
         amountCents: 50000,
-        received: const Value(true),
       ));
+      await repo.materializeReceivedPaychecks(
+          profileId: profileId, now: DateTime(2026, 6, 15));
       await repo.upsertPaycheck(PaychecksCompanion.insert(
         profileId: profileId,
         name: 'To the jar',
@@ -1172,6 +1175,43 @@ void main() {
       ));
       final entries = await db.select(db.budgetEntries).get();
       expect(entries.map((e) => e.description), ['To the jar']);
+    });
+
+    test('but marking one paid or received yourself with no account is '
+        'recorded, since it may be cash', () async {
+      await linked();
+      final billId = await repo.upsertBill(BillsCompanion.insert(
+          profileId: profileId, name: 'Cash rent', amountCents: 40000, dueDay: 1));
+      await repo.setBillPaid(
+          profileId: profileId, billId: billId, month: DateTime(2026, 6), paid: true);
+      await repo.upsertPaycheck(PaychecksCompanion.insert(
+        profileId: profileId,
+        name: 'Cash job',
+        date: DateTime(2026, 6, 2),
+        amountCents: 9000,
+        received: const Value(true),
+      ));
+      final entries = await db.select(db.budgetEntries).get();
+      expect(entries.map((e) => e.description).toSet(), {'Cash rent', 'Cash job'});
+
+      // Autopay, which Clearly does by itself, waits for the bank instead.
+      final autoBill = await repo.upsertBill(BillsCompanion.insert(
+          profileId: profileId,
+          name: 'Autopay thing',
+          amountCents: 1500,
+          dueDay: 1,
+          autopay: const Value(true)));
+      await repo.materializeAutopayPayments(
+          profileId: profileId, month: DateTime(2026, 6));
+      expect(
+          (await db.select(db.billPayments).get()).any((p) => p.billId == autoBill),
+          isTrue,
+          reason: 'it is marked paid');
+      expect(
+          (await db.select(db.budgetEntries).get())
+              .any((e) => e.description == 'Autopay thing'),
+          isFalse,
+          reason: 'but the bank supplies the entry');
     });
   });
 

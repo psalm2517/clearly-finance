@@ -707,6 +707,7 @@ class HomebaseRepository {
     required int billId,
     required DateTime month,
     required bool paid,
+    bool automatic = false,
   }) async {
     final periodStart = DateTime(month.year, month.month);
     if (paid) {
@@ -729,6 +730,7 @@ class HomebaseRepository {
         profileId: profileId,
         billId: billId,
         periodStart: periodStart,
+        automatic: automatic,
       );
     } else {
       // Reverse whatever balance change the payment caused before the
@@ -774,6 +776,7 @@ class HomebaseRepository {
     required int profileId,
     required int billId,
     required DateTime periodStart,
+    bool automatic = false,
   }) async {
     final payment =
         await (_db.select(_db.billPayments)..where(
@@ -803,6 +806,7 @@ class HomebaseRepository {
       cardId: bill.paymentSourceType == PaymentSourceType.card
           ? bill.paymentSourceId
           : null,
+      automatic: automatic,
     )) {
       return;
     }
@@ -909,6 +913,7 @@ class HomebaseRepository {
         billId: bill.id,
         month: periodStart,
         paid: true,
+        automatic: true,
       );
     }
   }
@@ -2560,12 +2565,16 @@ class HomebaseRepository {
     return id;
   }
 
-  Future<void> _syncPaycheckEntry(Paycheck paycheck) async {
+  Future<void> _syncPaycheckEntry(
+    Paycheck paycheck, {
+    bool automatic = false,
+  }) async {
     // Deposited into a bank-synced account: the deposit arrives from the
     // bank as its own entry, so no income entry or balance move is made.
     if (await _bankOwns(
       profileId: paycheck.profileId,
       accountId: paycheck.accountId,
+      automatic: automatic,
     )) {
       return;
     }
@@ -2681,7 +2690,7 @@ class HomebaseRepository {
     for (final paycheck in due) {
       await (_db.update(_db.paychecks)..where((p) => p.id.equals(paycheck.id)))
           .write(const PaychecksCompanion(received: Value(true)));
-      await _syncPaycheckEntry(paycheck.copyWith(received: true));
+      await _syncPaycheckEntry(paycheck.copyWith(received: true), automatic: true);
     }
   }
 
@@ -3416,15 +3425,23 @@ class HomebaseRepository {
   /// a feed is connected: recurring items rarely name an account, and the
   /// charge or deposit arrives from the bank anyway, so an entry of their
   /// own would only be a second copy of it.
+  ///
+  /// That holds for what Clearly does by itself ([automatic]): a paycheck
+  /// that lands on payday, an autopay bill, a repeating charge. When the
+  /// person marks something paid or received themselves with no account named,
+  /// it is theirs to record (cash, say), and if it turns out to be the bank's
+  /// transaction too the duplicate is removed when the bank's copy arrives.
   Future<bool> _bankOwns({
     required int profileId,
     int? accountId,
     int? cardId,
+    bool automatic = true,
   }) async {
     if (accountId != null) {
       return isSimpleFinLinked(FeedTarget.account, accountId);
     }
     if (cardId != null) return isSimpleFinLinked(FeedTarget.card, cardId);
+    if (!automatic) return false;
     final connection = await (_db.select(_db.simpleFinConnections)
           ..where((c) => c.profileId.equals(profileId))
           ..limit(1))

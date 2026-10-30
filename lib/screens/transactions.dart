@@ -313,7 +313,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           Text('${splits.isEmpty ? e.category : 'Split'}'
               '${e.payee != null ? ' • ${e.payee}' : ''}'
               '${sourceLabel != null ? ' • $sourceLabel' : ''} • '
-              '${_fmtDate(e.date)}'),
+              '${_fmtDate(e.date)}'
+              '${e.externalId != null ? ' • From your bank' : ''}'),
           if (tags.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -341,7 +342,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           IconButton(
             tooltip: automatic
                 ? 'Added automatically — edit it where it comes from'
-                : 'Edit',
+                : e.externalId != null
+                    ? 'Edit its category, notes and tags'
+                    : 'Edit',
             icon: const Icon(Icons.edit_outlined, size: 18),
             onPressed:
                 automatic ? null : () => showAddTransaction(context, ref, existing: e),
@@ -363,9 +366,13 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete this transaction?'),
-        content: Text(
-            '${e.description ?? e.category} (${fmtCents(e.amountCents)}) '
-            'is removed, and any balance it moved is put back.'),
+        content: Text(e.externalId != null
+            ? '${e.description ?? e.category} (${fmtCents(e.amountCents)}) '
+                'came from your bank. Deleting it hides it from Clearly and '
+                'it stays hidden when you sync. Your balance still follows '
+                'the bank.'
+            : '${e.description ?? e.category} (${fmtCents(e.amountCents)}) '
+                'is removed, and any balance it moved is put back.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),

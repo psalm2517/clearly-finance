@@ -140,6 +140,94 @@ class _BankSyncSectionState extends ConsumerState<BankSyncSection> {
     );
   });
 
+  Future<void> _confirmUnlink(SimpleFinFeedAccount f) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Unlink "${f.name}"?'),
+        content: const Text(
+          'Its balance stops following the bank, and transactions you add by '
+          'hand move it again. Everything already imported stays.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Unlink'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _run(() => _repo.unlinkSimpleFinAccount(f.id));
+  }
+
+  Future<void> _reviewUnmatched(List<BudgetEntry> stray) async {
+    final names = {
+      for (final a in await _repo.watchAccounts(profileId: _profileId).first)
+        'a${a.id}': a.name,
+      for (final c in await _repo.watchCards(profileId: _profileId).first)
+        'c${c.id}': c.name,
+    };
+    if (!mounted) return;
+    String day(DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final remove = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Not matched to the bank'),
+        content: SizedBox(
+          width: 520,
+          height: 360,
+          child: ListView(
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'You typed these in, and the bank did not report a matching '
+                  'transaction. If the bank already has the real one, these '
+                  'are copies. Removing them does not change any balance.',
+                ),
+              ),
+              for (final e in stray)
+                ListTile(
+                  dense: true,
+                  title: Text(e.description ?? e.category),
+                  subtitle: Text(
+                    '${day(e.date)} · '
+                    '${names[e.cardId != null ? 'c${e.cardId}' : 'a${e.accountId}'] ?? ''}',
+                  ),
+                  trailing: Text(
+                    '${e.type == EntryType.income ? '+' : '-'}${fmtCents(e.amountCents)}',
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep them'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Remove ${stray.length}'),
+          ),
+        ],
+      ),
+    );
+    if (remove != true) return;
+    await _run(
+      () => _repo.deleteBudgetEntries(
+        profileId: _profileId,
+        ids: [for (final e in stray) e.id],
+      ),
+    );
+  }
+
   Future<void> _linkExisting(SimpleFinFeedAccount f) async {
     final accounts = await _repo.watchAccounts(profileId: _profileId).first;
     final cards = await _repo.watchCards(profileId: _profileId).first;
@@ -150,6 +238,14 @@ class _BankSyncSectionState extends ConsumerState<BankSyncSection> {
       builder: (context) => SimpleDialog(
         title: Text('Link "${f.name}" to'),
         children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 0, 24, 12),
+            child: Text(
+              'Its balance will follow the bank from now on. Transactions you '
+              'typed in that the bank also reports are matched to the bank\'s '
+              'version. Any it does not match are listed here to review.',
+            ),
+          ),
           if (accounts.isEmpty && cards.isEmpty && loans.isEmpty)
             const Padding(
               padding: EdgeInsets.all(24),
@@ -317,9 +413,42 @@ class _BankSyncSectionState extends ConsumerState<BankSyncSection> {
                             onLink: () => _linkExisting(f),
                             onIgnore: () =>
                                 _run(() => _repo.ignoreSimpleFinAccount(f.id)),
-                            onUnlink: () =>
-                                _run(() => _repo.unlinkSimpleFinAccount(f.id)),
+                            onUnlink: () => _confirmUnlink(f),
                           ),
+                        FutureBuilder<List<BudgetEntry>>(
+                          future: _repo.unmatchedManualEntries(_profileId),
+                          builder: (context, snap) {
+                            final stray = snap.data ?? const <BudgetEntry>[];
+                            if (stray.isEmpty) return const SizedBox.shrink();
+                            return Column(
+                              children: [
+                                const Divider(height: 1),
+                                ListTile(
+                                  leading: Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: scheme.tertiary,
+                                  ),
+                                  title: Text(
+                                    '${stray.length} hand-entered '
+                                    '${stray.length == 1 ? 'transaction' : 'transactions'}'
+                                    ' not matched to the bank',
+                                  ),
+                                  subtitle: const Text(
+                                    'They sit inside the period the bank '
+                                    'covers, so they are counted on top of '
+                                    'the bank\'s own.',
+                                  ),
+                                  trailing: FilledButton.tonal(
+                                    onPressed: _busy
+                                        ? null
+                                        : () => _reviewUnmatched(stray),
+                                    child: const Text('Review'),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ],
                     ),
             ),

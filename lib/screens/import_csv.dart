@@ -65,11 +65,24 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text('Import ${widget.sourceFilename}')),
-      body: StreamBuilder<List<Account>>(
-        stream: repo.watchAccounts(profileId: profileId),
+      body: StreamBuilder<List<Object>>(
+        stream: combineLatest<Object>([
+          repo.watchAccounts(profileId: profileId),
+          repo.watchSimpleFinFeedAccounts(profileId: profileId),
+        ]),
         builder: (context, snap) {
-          final accounts = (snap.data ?? [])
-              .where((a) => HomebaseRepository.cashAccountTypes.contains(a.type))
+          // An account that is synced gets its transactions from the bank, so
+          // a file imported into it would only duplicate them.
+          final synced = {
+            for (final f in (snap.data?[1] as List<SimpleFinFeedAccount>?) ??
+                const <SimpleFinFeedAccount>[])
+              if (f.target == FeedTarget.account && f.targetId != null)
+                f.targetId!,
+          };
+          final accounts = ((snap.data?[0] as List<Account>?) ?? [])
+              .where((a) =>
+                  HomebaseRepository.cashAccountTypes.contains(a.type) &&
+                  !synced.contains(a.id))
               .toList();
           _accountId ??= accounts.firstOrNull?.id;
           if (_step == 0) {
@@ -95,8 +108,9 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
           const Card(
             child: Padding(
               padding: EdgeInsets.all(16),
-              child: Text('Add a checking, savings or cash account first — '
-                  'that\'s where these transactions will land.'),
+              child: Text('Add a checking, savings or cash account that is not '
+                  'synced first — that\'s where these transactions will land. '
+                  'Synced accounts get theirs from your bank.'),
             ),
           )
         else
