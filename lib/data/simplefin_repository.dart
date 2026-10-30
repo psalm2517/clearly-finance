@@ -135,6 +135,35 @@ extension SimpleFinRepository on HomebaseRepository {
     SimpleFinClient? client,
     DateTime? now,
     Duration? lookback,
+  }) {
+    // One sync at a time: the daily one and a press of Sync now can overlap,
+    // and two reading the same window would both import what neither had
+    // yet seen.
+    final done = Completer<SimpleFinSyncResult>();
+    final turn = _syncTail;
+    _syncTail = done.future.then<void>((_) {}, onError: (_) {});
+    turn.then((_) async {
+      try {
+        done.complete(await _syncNow(
+          profileId: profileId,
+          client: client,
+          now: now,
+          lookback: lookback,
+        ));
+      } catch (e, st) {
+        done.completeError(e, st);
+      }
+    });
+    return done.future;
+  }
+
+  static Future<void> _syncTail = Future<void>.value();
+
+  Future<SimpleFinSyncResult> _syncNow({
+    required int profileId,
+    SimpleFinClient? client,
+    DateTime? now,
+    Duration? lookback,
   }) async {
     final c = client ?? SimpleFinClient();
     final at = now ?? DateTime.now();
@@ -1258,6 +1287,81 @@ extension SimpleFinRepository on HomebaseRepository {
         targetId: Value(targetId),
       ),
     );
+    await _adoptFeedEntries(feedAccountId, target, targetId);
+  }
+
+  /// Entries already imported from this feed account belong to whatever it
+  /// is linked to now. Without this, unlinking and linking it to a different
+  /// account (or deleting an account and linking again) would leave the old
+  /// transactions behind and import nothing new, because the sync knows it has
+  /// seen them.
+  Future<void> _adoptFeedEntries(
+      int feedAccountId, FeedTarget target, int targetId) async {
+    if (target == FeedTarget.loan) return;
+    final feed = await (_db.select(_db.simpleFinFeedAccounts)
+          ..where((f) => f.id.equals(feedAccountId)))
+        .getSingle();
+    await (_db.update(_db.budgetEntries)
+          ..where((e) => e.externalId.like('${feed.remoteId}:%')))
+        .write(BudgetEntriesCompanion(
+      accountId:
+          Value(target == FeedTarget.account ? targetId : null),
+      cardId: Value(target == FeedTarget.card ? targetId : null),
+    ));
+  }
+
+  /// Bank entries the person deleted are remembered as removed, so the
+  /// next sync does not read them from the bank again.
+  Future<void> _rememberDeletedBankEntries(List<BudgetEntry> entries) async {
+    for (final e in entries) {
+      final id = e.externalId;
+      if (id == null) continue;
+      await _db.into(_db.simpleFinSkipped).insert(
+            SimpleFinSkippedCompanion.insert(
+              profileId: e.profileId,
+              externalId: id,
+            ),
+            mode: InsertMode.insertOrIgnore,
+          );
+    }
+  }
+
+  /// Entries typed in by hand on an account or card that is now synced, that
+  /// the bank's own transactions did not claim. They are inside the period
+  /// the bank covers, so they are almost certainly copies of something the
+  /// bank reported differently (a tip, a pending amount), and they are
+  /// counted on top of it. Listed so they can be reviewed and removed.
+  Future<List<BudgetEntry>> unmatchedManualEntries(int profileId) async {
+    final bank = await (_db.select(_db.budgetEntries)
+          ..where((e) =>
+              e.profileId.equals(profileId) & e.externalId.isNotNull()))
+        .get();
+    if (bank.isEmpty) return const [];
+    final since = <String, DateTime>{};
+    for (final e in bank) {
+      final key = e.cardId != null ? 'c:${e.cardId}' : 'a:${e.accountId}';
+      final cur = since[key];
+      if (cur == null || e.date.isBefore(cur)) since[key] = e.date;
+    }
+    final manual = await (_db.select(_db.budgetEntries)
+          ..where((e) =>
+              e.profileId.equals(profileId) &
+              e.externalId.isNull() &
+              e.sourcePaycheckId.isNull() &
+              e.sourceBillPaymentId.isNull() &
+              e.sourceRecurringTransactionLogId.isNull()))
+        .get();
+    return [
+      for (final e in manual)
+        if ((e.accountId != null || e.cardId != null) &&
+            () {
+              final key =
+                  e.cardId != null ? 'c:${e.cardId}' : 'a:${e.accountId}';
+              final from = since[key];
+              return from != null && !e.date.isBefore(from);
+            }())
+          e,
+    ];
   }
 
   /// Creates an account, card or loan from a feed account's name and

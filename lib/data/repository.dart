@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:csv/csv.dart';
 import 'package:drift/drift.dart';
 
@@ -1354,6 +1356,9 @@ class HomebaseRepository {
         _db.budgetEntries,
       )..where((e) => e.profileId.equals(profileId) & e.id.equals(id))).go();
       if (entry != null) {
+        // A bank transaction deleted by hand stays deleted: the next sync
+        // would otherwise read it from the bank again.
+        await _rememberDeletedBankEntries([entry]);
         final isExpense = entry.type == EntryType.expense;
         if (entry.accountId != null) {
           await _adjustAccountBalance(
@@ -1391,6 +1396,7 @@ class HomebaseRepository {
       await (_db.delete(
         _db.budgetEntries,
       )..where((e) => e.profileId.equals(profileId) & e.id.isIn(ids))).go();
+      await _rememberDeletedBankEntries(entries);
       for (final entry in entries) {
         final isExpense = entry.type == EntryType.expense;
         if (entry.accountId != null) {
@@ -1437,9 +1443,22 @@ class HomebaseRepository {
                 '${e.accountId}:${e.cardId}';
             groups.putIfAbsent(key, () => []).add(e);
           }
+          // Two entries the bank reported separately are two transactions,
+          // whatever they look like, so only one bank entry per group can be
+          // a duplicate of anything (of a hand-typed one).
           final duplicateGroups = [
             for (final g in groups.values)
-              if (g.length > 1) g,
+              if (() {
+                final manual = g.where((e) => e.externalId == null);
+                final bank = g.where((e) => e.externalId != null);
+                return manual.length + (bank.isEmpty ? 0 : 1) > 1;
+              }())
+                () {
+                  final manual = g.where((e) => e.externalId == null).toList();
+                  final bank = g.where((e) => e.externalId != null);
+                  return [...manual, if (bank.isNotEmpty) bank.first]
+                    ..sort((a, b) => a.id.compareTo(b.id));
+                }(),
           ];
           duplicateGroups.sort((a, b) => b.first.date.compareTo(a.first.date));
           return duplicateGroups;
@@ -1461,6 +1480,19 @@ class HomebaseRepository {
               ..where((e) => e.profileId.equals(profileId) & e.id.equals(id)))
             .getSingleOrNull();
     if (old == null) return;
+
+    // What the bank reported (amount, direction, date, account) is the
+    // bank's. A hand edit can still change how it is categorized, described,
+    // split and tagged, but not what happened.
+    if (old.externalId != null) {
+      entry = entry.copyWith(
+        amountCents: const Value.absent(),
+        type: const Value.absent(),
+        date: const Value.absent(),
+        accountId: const Value.absent(),
+        cardId: const Value.absent(),
+      );
+    }
 
     final newAccountId = entry.accountId.present
         ? entry.accountId.value
@@ -2976,6 +3008,12 @@ class HomebaseRepository {
             ))
             .get();
     for (final transfer in transfers) {
+      // Both ends synced: the bank delivers both sides and they are paired
+      // into one movement, so posting it here as well would be a second.
+      if (await isSimpleFinLinked(FeedTarget.account, transfer.fromAccountId) &&
+          await isSimpleFinLinked(FeedTarget.account, transfer.toAccountId)) {
+        continue;
+      }
       final already = await (_db.select(
         _db.transferLogs,
       )..where((l) => l.transferId.equals(transfer.id))).get();
@@ -3057,6 +3095,19 @@ class HomebaseRepository {
           throw ArgumentError('choose an account or a card, not both');
         }
         if (!draft.repeats) {
+          // A synced account or card gets its transactions from the bank. One
+          // typed in as well would be a second copy of the same thing.
+          if ((draft.accountId != null &&
+                  await isSimpleFinLinked(
+                      FeedTarget.account, draft.accountId!)) ||
+              (draft.cardId != null &&
+                  await isSimpleFinLinked(FeedTarget.card, draft.cardId!))) {
+            throw ArgumentError(
+              'that account is synced with your bank, which supplies its '
+              'transactions. Leave the account blank for cash, or pick one '
+              'that is not synced',
+            );
+          }
           if (draft.splits.isNotEmpty &&
               draft.splits.fold(0, (s, r) => s + r.amountCents) !=
                   draft.amountCents) {
@@ -3685,6 +3736,10 @@ class HomebaseRepository {
     required int accountId,
     required List<ParsedImportRow> rows,
   }) async {
+    if (await isSimpleFinLinked(FeedTarget.account, accountId)) {
+      throw StateError('That account is synced with your bank, so there is '
+          'nothing to import into it.');
+    }
     final existing =
         await (_db.select(_db.budgetEntries)..where(
               (e) =>
@@ -3720,6 +3775,10 @@ class HomebaseRepository {
     required List<ParsedImportRow> rows,
     required bool updateAccountBalance,
   }) async {
+    if (await isSimpleFinLinked(FeedTarget.account, accountId)) {
+      throw StateError('That account is synced with your bank, so there is '
+          'nothing to import into it.');
+    }
     final netCents = rows.fold(0, (s, r) => s + r.amountCents);
     late int batchId;
     await _db.transaction(() async {
@@ -3825,6 +3884,13 @@ class HomebaseRepository {
             .getSingleOrNull();
     if (batch == null) return;
     await _db.transaction(() async {
+      // Undoing a bank import must not bring it straight back on the next
+      // sync, so what it brought in is remembered as removed.
+      await _rememberDeletedBankEntries(
+        await (_db.select(_db.budgetEntries)
+              ..where((e) => e.importBatchId.equals(batchId)))
+            .get(),
+      );
       if (batch.accountId != null && batch.balanceAdjustmentCents != 0) {
         await _adjustAccountBalance(
           batch.accountId!,

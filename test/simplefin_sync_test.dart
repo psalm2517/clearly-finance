@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:clearly/data/database.dart';
 import 'package:clearly/data/repository.dart';
+import 'package:clearly/data/backup.dart';
 import 'package:clearly/data/simplefin.dart';
 import 'package:clearly/data/transaction_draft.dart';
 
@@ -686,15 +687,19 @@ void main() {
         received: const Value(true),
         accountId: Value(accountId),
       ));
-      await repo.addTransaction(
-        profileId: profileId,
-        draft: TransactionDraft(
-          kind: DraftKind.expense,
-          amountCents: 700,
-          date: DateTime.now(),
-          name: 'Coffee',
-          accountId: accountId,
+      // A hand-typed entry on a synced account is refused outright.
+      expect(
+        () => repo.addTransaction(
+          profileId: profileId,
+          draft: TransactionDraft(
+            kind: DraftKind.expense,
+            amountCents: 700,
+            date: DateTime.now(),
+            name: 'Coffee',
+            accountId: accountId,
+          ),
         ),
+        throwsArgumentError,
       );
 
       expect((await db.select(db.accounts).get()).single.balanceCents, 100000,
@@ -1321,6 +1326,266 @@ void main() {
         ],
       );
       expect(total, 75000);
+    });
+  });
+
+  group('hand entry and the bank on the same account', () {
+    Future<int> linkedChecking({List<Map<String, Object?>>? txns}) async {
+      bridge.accounts = [
+        {
+          'id': 'CHK',
+          'name': 'Checking',
+          'balance': '500.00',
+          'transactions': txns ??
+              [txn('t1', '-12.00', 'LUNCH', posted: DateTime(2026, 6, 10))],
+        },
+      ];
+      await repo.connectSimpleFin(
+          profileId: profileId, setupToken: token(), client: client, now: now);
+      return repo.createFromSimpleFinAccount(
+          profileId: profileId,
+          feedAccountId: (await feed()).single.id,
+          kind: FeedTarget.account);
+    }
+
+    Future<void> sync({Duration? lookback}) => repo.syncSimpleFin(
+        profileId: profileId,
+        client: client,
+        now: now,
+        lookback: lookback ?? const Duration(days: 30));
+
+    test('deleting a bank transaction keeps it deleted', () async {
+      await linkedChecking();
+      await sync();
+      final e = (await db.select(db.budgetEntries).get()).single;
+      await repo.deleteBudgetEntry(profileId: profileId, id: e.id);
+      await sync();
+      expect(await db.select(db.budgetEntries).get(), isEmpty,
+          reason: 'the next sync must not read it from the bank again');
+      expect((await db.select(db.accounts).get()).single.balanceCents, 50000);
+    });
+
+    test('undoing a bank import does not bring it straight back', () async {
+      await linkedChecking();
+      await sync();
+      final batch = (await db.select(db.importBatches).get()).single;
+      await repo.undoImportBatch(profileId: profileId, batchId: batch.id);
+      expect(await db.select(db.budgetEntries).get(), isEmpty);
+      await sync();
+      expect(await db.select(db.budgetEntries).get(), isEmpty);
+    });
+
+    test('a bank transaction keeps its amount, date and account, but can '
+        'be recategorized', () async {
+      final acct = await linkedChecking();
+      await sync();
+      final other = await repo.upsertAccount(AccountsCompanion.insert(
+          profileId: profileId, name: 'Other', type: AccountType.checking));
+      final e = (await db.select(db.budgetEntries).get()).single;
+      await repo.updateBudgetEntry(
+        profileId: profileId,
+        id: e.id,
+        entry: BudgetEntriesCompanion(
+          amountCents: const Value(9999),
+          type: const Value(EntryType.income),
+          date: Value(DateTime(2020, 1, 1)),
+          accountId: Value(other),
+          category: const Value('Food & Dining'),
+          description: const Value('Team lunch'),
+        ),
+      );
+      final after = (await db.select(db.budgetEntries).get()).single;
+      expect(after.amountCents, 1200);
+      expect(after.type, EntryType.expense);
+      expect(after.date, DateTime(2026, 6, 10));
+      expect(after.accountId, acct);
+      expect(after.category, 'Food & Dining');
+      expect(after.description, 'Team lunch');
+    });
+
+    test('a hand-typed entry on a synced account or card is refused, but '
+        'cash and manual accounts are fine', () async {
+      final synced = await linkedChecking();
+      final manual = await repo.upsertAccount(AccountsCompanion.insert(
+          profileId: profileId, name: 'Jar', type: AccountType.cash));
+      TransactionDraft draft({int? account, int? card}) => TransactionDraft(
+            kind: DraftKind.expense,
+            amountCents: 500,
+            date: DateTime(2026, 6, 14),
+            name: 'Coffee',
+            accountId: account,
+            cardId: card,
+          );
+      expect(() => repo.addTransaction(
+              profileId: profileId, draft: draft(account: synced), now: now),
+          throwsArgumentError);
+      await repo.addTransaction(
+          profileId: profileId, draft: draft(account: manual), now: now);
+      await repo.addTransaction(
+          profileId: profileId, draft: draft(), now: now);
+      expect(
+          (await db.select(db.budgetEntries).get())
+              .where((e) => e.externalId == null),
+          hasLength(2));
+    });
+
+    test('importing a CSV into a synced account is refused', () async {
+      final synced = await linkedChecking();
+      expect(
+          () => repo.commitImport(
+              profileId: profileId,
+              accountId: synced,
+              sourceFilename: 'x.csv',
+              rows: const [],
+              updateAccountBalance: false),
+          throwsStateError);
+      expect(
+          () => repo.previewImport(
+              profileId: profileId, accountId: synced, rows: const []),
+          throwsStateError);
+    });
+
+    test('two bank transactions that look alike are not duplicates; a hand '
+        'entry beside one is', () async {
+      final acct = await linkedChecking(txns: [
+        txn('a', '-5.00', 'COFFEE', posted: DateTime(2026, 6, 10)),
+        txn('b', '-5.00', 'COFFEE', posted: DateTime(2026, 6, 10)),
+      ]);
+      await sync();
+      expect(await repo.watchDuplicateGroups(profileId: profileId).first,
+          isEmpty);
+
+      await db.into(db.budgetEntries).insert(BudgetEntriesCompanion.insert(
+          profileId: profileId,
+          date: DateTime(2026, 6, 10),
+          amountCents: 500,
+          type: EntryType.expense,
+          description: const Value('COFFEE'),
+          accountId: Value(acct)));
+      final groups =
+          await repo.watchDuplicateGroups(profileId: profileId).first;
+      expect(groups, hasLength(1));
+      expect(groups.single, hasLength(2), reason: 'the hand entry and one bank');
+      expect(groups.single.where((e) => e.externalId == null), hasLength(1));
+    });
+
+    test('linking the feed to a different account moves its history with it, '
+        'and nothing is imported twice', () async {
+      final first = await linkedChecking();
+      await sync();
+      expect((await db.select(db.budgetEntries).get()).single.accountId, first);
+
+      final f = (await feed()).single;
+      await repo.unlinkSimpleFinAccount(f.id);
+      final second = await repo.upsertAccount(AccountsCompanion.insert(
+          profileId: profileId, name: 'Second', type: AccountType.checking));
+      await repo.linkSimpleFinAccount(
+          profileId: profileId,
+          feedAccountId: f.id,
+          target: FeedTarget.account,
+          targetId: second);
+      expect((await db.select(db.budgetEntries).get()).single.accountId,
+          second);
+      await sync();
+      expect(await db.select(db.budgetEntries).get(), hasLength(1));
+    });
+
+    test('a scheduled transfer between two synced accounts is not posted '
+        'as well, but one with a manual end still is', () async {
+      bridge.accounts = [
+        {'id': 'A', 'name': 'Checking', 'balance': '500.00', 'transactions': []},
+        {'id': 'B', 'name': 'Savings', 'balance': '900.00', 'transactions': []},
+      ];
+      await repo.connectSimpleFin(
+          profileId: profileId, setupToken: token(), client: client, now: now);
+      final ids = <int>[];
+      for (final a in await feed()) {
+        ids.add(await repo.createFromSimpleFinAccount(
+            profileId: profileId, feedAccountId: a.id, kind: FeedTarget.account));
+      }
+      final jar = await repo.upsertAccount(AccountsCompanion.insert(
+          profileId: profileId, name: 'Jar', type: AccountType.cash));
+      Future<void> schedule(int from, int to, String name) => repo
+          .upsertRecurringTransfer(RecurringTransfersCompanion.insert(
+              profileId: profileId,
+              name: name,
+              fromAccountId: from,
+              toAccountId: to,
+              amountCents: 1000,
+              frequency: PayFrequency.monthly,
+              anchorDate: DateTime(2026, 6, 1)))
+          .then((_) {});
+      await schedule(ids[0], ids[1], 'Both synced');
+      await schedule(ids[0], jar, 'One manual');
+      await repo.materializeDueTransfers(profileId: profileId, now: now);
+
+      final logs = await db.select(db.transferLogs).get();
+      final transfers = {
+        for (final t in await db.select(db.recurringTransfers).get()) t.id: t.name,
+      };
+      expect(logs.map((l) => transfers[l.transferId]).toSet(), {'One manual'});
+      expect((await db.select(db.accounts).get())
+              .firstWhere((a) => a.id == jar).balanceCents,
+          greaterThan(0));
+    });
+
+    test('hand entries the bank did not claim are listed; ones from before '
+        'the bank\'s history, or that matched, are not', () async {
+      final acct = await linkedChecking(txns: [
+        txn('t1', '-12.00', 'LUNCH', posted: DateTime(2026, 6, 10)),
+      ]);
+      Future<int> hand(DateTime d, int cents) => db
+          .into(db.budgetEntries)
+          .insert(BudgetEntriesCompanion.insert(
+              profileId: profileId,
+              date: d,
+              amountCents: cents,
+              type: EntryType.expense,
+              description: const Value('typed'),
+              accountId: Value(acct)));
+      final old = await hand(DateTime(2026, 5, 1), 700);
+      final matching = await hand(DateTime(2026, 6, 10), 1200);
+      final stray = await hand(DateTime(2026, 6, 12), 4321);
+      await sync();
+
+      final ids = (await repo.unmatchedManualEntries(profileId))
+          .map((e) => e.id)
+          .toSet();
+      expect(ids, {stray});
+      expect(ids, isNot(contains(old)));
+      expect(ids, isNot(contains(matching)));
+      final claimed = (await db.select(db.budgetEntries).get())
+          .firstWhere((e) => e.id == matching);
+      expect(claimed.externalId, 'CHK:t1');
+    });
+
+    test('two syncs at once import each transaction once', () async {
+      await linkedChecking();
+      final results = await Future.wait([
+        repo.syncSimpleFin(
+            profileId: profileId,
+            client: client,
+            now: now,
+            lookback: const Duration(days: 30)),
+        repo.syncSimpleFin(
+            profileId: profileId,
+            client: client,
+            now: now,
+            lookback: const Duration(days: 30)),
+      ]);
+      expect(await db.select(db.budgetEntries).get(), hasLength(1));
+      expect(results.fold(0, (s, r) => s + r.newTransactions), 1);
+    });
+
+    test('the memory of removed bank entries travels with a backup',
+        () async {
+      await linkedChecking();
+      await sync();
+      final e = (await db.select(db.budgetEntries).get()).single;
+      await repo.deleteBudgetEntry(profileId: profileId, id: e.id);
+      final json =
+          await BackupService(db).exportJson(profileIds: [profileId]);
+      expect(BackupService(db).inspect(json).rowCounts['simpleFinSkipped'], 1);
     });
   });
 }

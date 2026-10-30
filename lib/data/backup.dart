@@ -67,6 +67,7 @@ class BackupService {
     return [
       (name: 'profiles', table: _db.profiles, where: (ids) => 'id IN ($ids)'),
       (name: 'accounts', table: _db.accounts, where: byProfileId),
+      (name: 'simpleFinSkipped', table: _db.simpleFinSkipped, where: byProfileId),
       (
         name: 'accountBalanceSnapshots',
         table: _db.accountBalanceSnapshots,
