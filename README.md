@@ -9,6 +9,8 @@
 
 ### __Knowing your financial health shouldn't cost you $15 a month.__
 
+[seeclearly.app](https://seeclearly.app)
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Android-lightgrey.svg)](#building)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
@@ -106,9 +108,8 @@ upgrade a real database of each older shape.
 
 ## Coming next
 
+- Flathub submission
 - An Investments tab
-- Flatpak submission
-- The website
 - Android build, and eventually Windows and macOS builds
 
 ## AI disclosure
