@@ -60,3 +60,4 @@ homebase-backup-*.json
 
 # Local-only demo data generator, deliberately not part of the repo.
 tool/
+dist/

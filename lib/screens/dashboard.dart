@@ -238,7 +238,7 @@ class DashboardScreen extends ConsumerWidget {
                                             profileId: profileId),
                                         builder: (context, loansSnap) {
                                           final loans = loansSnap.data ?? [];
-                                          return _AssetsDebtBreakdown(
+                                          return AssetsDebtBreakdown(
                                             net: net,
                                             scheme: scheme,
                                             accounts: accounts,
@@ -876,8 +876,10 @@ class _NetWorthHero extends StatelessWidget {
 /// space next to the net worth chart with something more useful than
 /// empty page, and answers "what is that number actually made of" without
 /// leaving the Dashboard for the Accounts tab.
-class _AssetsDebtBreakdown extends StatelessWidget {
-  const _AssetsDebtBreakdown({
+/// The assets-versus-debt ring and its legend (also exported as an image for
+/// the website).
+class AssetsDebtBreakdown extends StatelessWidget {
+  const AssetsDebtBreakdown({
     required this.net,
     required this.scheme,
     required this.accounts,
