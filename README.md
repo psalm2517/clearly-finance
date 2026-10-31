@@ -16,7 +16,7 @@ __Knowing your financial health shouldn't cost you $15 a month.__
 Free, open-source personal finance for the desktop. Your data stays on your
 computer.
 
-![Clearly dashboard](docs/screenshots/dashboard.png)
+![Clearly dashboard](docs/screenshots/dashboard-0.7.png)
 
 </div>
 
@@ -42,9 +42,9 @@ attention: a projected shortfall, high card use, a category running hot.
 cash, cards, loans and goals. Loans show payoff progress and a "what if" for
 extra payments. Goals track a savings or payoff target.
 
-![Accounts](docs/screenshots/accounts.png)
+![Accounts](docs/screenshots/accounts-0.7.png)
 
-![Goals](docs/screenshots/goals.png)
+![Goals](docs/screenshots/goals-0.7.png)
 
 **Transactions.** A searchable register across every month, with filters,
 tags and split transactions.
@@ -52,12 +52,12 @@ tags and split transactions.
 **Cash Flow.** Where the month's money came from and where it went, spending
 by category, and a projected balance that warns you before it goes negative.
 
-![Cash Flow](docs/screenshots/cash-flow.png)
+![Cash Flow](docs/screenshots/cash-flow-0.7.png)
 
 **Budget.** Targets for each category, with bills and paychecks counted in
 the plan, so every dollar is counted once.
 
-![Budget](docs/screenshots/budget.png)
+![Budget](docs/screenshots/budget-0.7.png)
 
 **Recurring.** Upcoming bills, paychecks, transfers and repeating
 transactions. Clearly also finds subscriptions and regular deposits in your
