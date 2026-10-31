@@ -2,7 +2,7 @@
 
 # Clearly
 
-### See clearly.
+### __Knowing your financial health shouldn't cost you $15 a month.__
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Android-lightgrey.svg)](#building)
@@ -10,8 +10,6 @@
 [![Version](https://img.shields.io/badge/version-0.7.0-informational.svg)](https://github.com/amandoti-win/clearly/releases)
 
 ### [⬇ Download for Linux](https://github.com/amandoti-win/clearly/releases/download/v0.7.0/clearly-linux-x64-v0.7.0.tar.gz)
-
-__Knowing your financial health shouldn't cost you $15 a month.__
 
 Free, open-source personal finance for the desktop. Your data stays on your
 computer.
