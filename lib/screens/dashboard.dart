@@ -24,19 +24,37 @@ Widget _dashRow(Widget left, Widget right) {
       if (constraints.maxWidth < 820) {
         return Column(children: [left, kSectionGap, right]);
       }
-      return IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(child: left),
-            const SizedBox(width: 24),
-            Expanded(child: right),
-          ],
-        ),
+      // Both sides get the same minimum height, so the two cards line up
+      // without asking the framework to measure their contents twice (an
+      // IntrinsicHeight here made scrolling the dashboard stutter).
+      const minHeight = 380.0;
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: minHeight),
+              child: left,
+            ),
+          ),
+          const SizedBox(width: 24),
+          Expanded(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: minHeight),
+              child: right,
+            ),
+          ),
+        ],
       );
     },
   );
 }
+
+/// Two sections one under the other, each the full width.
+Widget _stackSections(Widget a, Widget b) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [a, kSectionGap, b],
+    );
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -345,7 +363,7 @@ class DashboardScreen extends ConsumerWidget {
         kSectionGap,
         _CashOutlookCard(profileId: profileId),
         kSectionGap,
-        _dashRow(
+        _stackSections(
           StreamBuilder<List<CreditCard>>(
             stream: repo.watchCards(profileId: profileId),
             builder: (context, snap) {
@@ -401,11 +419,39 @@ class DashboardScreen extends ConsumerWidget {
                     )
                   else
                     Card(
-                      child: Column(
-                        children: [
-                          for (final c in cards)
-                            _utilizationTile(context, c, scheme),
-                        ],
+                      // Two columns when there is room, so a couple of cards
+                      // do not leave a tall empty strip beside them.
+                      child: LayoutBuilder(
+                        builder: (context, box) {
+                          final tiles = [
+                            for (final c in cards)
+                              _utilizationTile(context, c, scheme),
+                          ];
+                          if (box.maxWidth < 760 || tiles.length < 2) {
+                            return Column(children: tiles);
+                          }
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    for (var i = 0; i < tiles.length; i += 2)
+                                      tiles[i],
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    for (var i = 1; i < tiles.length; i += 2)
+                                      tiles[i],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                 ],

@@ -1,5 +1,10 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/logo/clearly-mark.svg">
+  <img src="docs/logo/clearly-mark-light.svg" alt="Clearly" height="96">
+</picture>
+
 # Clearly
 
 ### __Knowing your financial health shouldn't cost you $15 a month.__
@@ -7,10 +12,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Android-lightgrey.svg)](#building)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
-[![Version](https://img.shields.io/badge/version-0.7.0-informational.svg)](https://github.com/amandoti-win/clearly/releases)
-[![Downloads](https://img.shields.io/github/downloads/amandoti-win/clearly/total.svg)](https://github.com/amandoti-win/clearly/releases)
+[![Version](https://img.shields.io/badge/version-0.7.0-informational.svg)](https://github.com/amandoti-win/clearly-finance/releases)
+[![Downloads](https://img.shields.io/github/downloads/amandoti-win/clearly-finance/total.svg)](https://github.com/amandoti-win/clearly-finance/releases)
 
-### [⬇ Download for Linux](https://github.com/amandoti-win/clearly/releases/download/v0.7.0/clearly-linux-x64-v0.7.0.tar.gz)
+### [⬇ Download for Linux](https://github.com/amandoti-win/clearly-finance/releases/download/v0.7.0/clearly-linux-x64-v0.7.0.tar.gz)
 
 Free, open-source personal finance for the desktop. Your data stays on your
 computer.

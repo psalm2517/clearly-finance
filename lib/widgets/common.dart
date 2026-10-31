@@ -22,7 +22,10 @@ class MoneyText extends StatelessWidget {
     if (dot == -1) return Text(formatted, style: style);
     final whole = formatted.substring(0, dot);
     final cents = formatted.substring(dot);
-    final base = (style ?? DefaultTextStyle.of(context).style).copyWith(
+    // Merge into the surrounding text style: a RichText does not inherit it on
+    // its own, so a style without a colour would otherwise paint white, which
+    // is invisible on a light theme.
+    final base = DefaultTextStyle.of(context).style.merge(style).copyWith(
       fontFeatures: const [FontFeature.tabularFigures()],
     );
     final mutedColor =
