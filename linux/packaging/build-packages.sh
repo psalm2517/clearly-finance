@@ -62,6 +62,19 @@ cp -r "$bundle"/. "$appdir/"
 cat > "$appdir/AppRun" <<'EOF'
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"
+# First run: add Clearly to the app menu with its icon, so it can be pinned or
+# put on the desktop like any installed app. Set CLEARLY_NO_INTEGRATE=1 to skip.
+if [ -n "$APPIMAGE" ] && [ -z "$CLEARLY_NO_INTEGRATE" ]; then
+  data="${XDG_DATA_HOME:-$HOME/.local/share}"
+  desk="$data/applications/clearly.desktop"
+  icon="$data/icons/hicolor/256x256/apps/clearly.png"
+  if ! grep -qsF "Exec=\"$APPIMAGE\"" "$desk"; then
+    mkdir -p "$data/applications" "$(dirname "$icon")"
+    cp "$HERE/clearly.png" "$icon"
+    sed "s|^Exec=.*|Exec=\"$APPIMAGE\"|; s|^Icon=.*|Icon=$icon|" "$HERE/clearly.desktop" > "$desk"
+    command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$data/applications" 2>/dev/null
+  fi
+fi
 exec "$HERE/clearly" "$@"
 EOF
 chmod +x "$appdir/AppRun"
