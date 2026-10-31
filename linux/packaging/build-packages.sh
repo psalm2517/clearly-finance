@@ -86,7 +86,7 @@ cp "$appdir/clearly.png" "$appdir/.DirIcon"
 # AppImageUpdate fetch only what changed; it needs the .zsync file uploaded
 # next to the AppImage (made here when zsyncmake is installed).
 ARCH=x86_64 "$tool" --appimage-extract-and-run \
-  -u "gh-releases-zsync|amandoti-win|clearly-finance|latest|Clearly-x86_64.AppImage.zsync" \
+  -u "gh-releases-zsync|Psalm2517|clearly-finance|latest|Clearly-x86_64.AppImage.zsync" \
   "$appdir" "$dist/Clearly-x86_64.AppImage"
 mv -f Clearly-x86_64.AppImage.zsync "$dist/" 2>/dev/null || true
 rm -rf "$appdir"
