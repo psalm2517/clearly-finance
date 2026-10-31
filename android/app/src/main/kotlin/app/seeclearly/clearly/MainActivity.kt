@@ -1,4 +1,4 @@
-package dev.clearly.clearly
+package app.seeclearly.clearly
 
 import io.flutter.embedding.android.FlutterActivity
 

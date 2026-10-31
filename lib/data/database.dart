@@ -960,6 +960,27 @@ class AppDatabase extends _$AppDatabase {
         },
       );
 
+  /// The app id changed from dev.clearly.clearly to app.seeclearly.Clearly, and
+  /// on Linux and Android the id names the data folder. Copy the old folder's
+  /// database and saved preferences (theme, accent) across once, before
+  /// anything reads them, so nobody's data or settings seem to vanish.
+  static Future<void> migratePreviousFolder() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final db = File(p.join(dir.path, 'clearly.sqlite'));
+      if (db.existsSync()) return;
+      final old = Directory(p.join(dir.parent.path, 'dev.clearly.clearly'));
+      if (!old.existsSync()) return;
+      await dir.create(recursive: true);
+      for (final name in ['clearly.sqlite', 'shared_preferences.json']) {
+        final f = File(p.join(old.path, name));
+        if (f.existsSync()) await f.copy(p.join(dir.path, name));
+      }
+    } catch (_) {
+      // Best-effort, like the rename migration below.
+    }
+  }
+
   /// Where the database file lives, or null when it is in memory.
   Future<String?> get databasePath async {
     final dir = await getApplicationSupportDirectory();
@@ -988,6 +1009,7 @@ class AppDatabase extends _$AppDatabase {
     try {
       final support = await getApplicationSupportDirectory();
       const previousDirs = [
+        ('dev.clearly.clearly', 'clearly.sqlite'),
         ('dev.granary.granary', 'granary.sqlite'),
         ('dev.homebase.homebase_money', 'homebase.sqlite'),
         ('dev.homebase.homebase_finance', 'homebase.sqlite'),

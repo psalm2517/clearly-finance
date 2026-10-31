@@ -8,4 +8,4 @@ Icon=clearly
 Terminal=false
 Categories=Office;Finance;
 Keywords=money;budget;finance;banking;
-StartupWMClass=dev.clearly.clearly
+StartupWMClass=app.seeclearly.Clearly

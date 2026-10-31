@@ -20,17 +20,20 @@ class CardsScreen extends ConsumerWidget {
     final repo = ref.watch(repositoryProvider);
     final profileId = ref.watch(activeProfileProvider)!.id;
     return Scaffold(
-      floatingActionButton: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton.extended(
-            heroTag: 'addCard',
-            onPressed: () => _edit(context, ref, null),
-            icon: const Icon(Icons.add),
-            label: const Text('Add card'),
-          ),
-        ],
-      ),
+      backgroundColor: Colors.transparent,
+      floatingActionButton: (ref.watch(activeProfileProvider)?.isSynced ?? false)
+          ? null
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                FloatingActionButton.extended(
+                  heroTag: 'addCard',
+                  onPressed: () => _edit(context, ref, null),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add card'),
+                ),
+              ],
+            ),
       body: StreamBuilder<List<CreditCard>>(
         stream: repo.watchCards(profileId: profileId),
         builder: (context, snap) {
@@ -54,10 +57,10 @@ class CardsScreen extends ConsumerWidget {
                       'A card has two dates each month: the statement closing '
                           'day, and the payment due day roughly 21-25 days '
                           'later.',
-                      'Granary uses these purely for timing — reminders and '
+                      'Clearly uses these purely for timing — reminders and '
                           'the "closes in N days" chip. Balance and '
                           'utilization always reflect what you owe right now.',
-                      'Set both days when you edit a card and Granary works '
+                      'Set both days when you edit a card and Clearly works '
                           'out the next occurrence of each automatically, '
                           'including short months.',
                     ],
@@ -70,7 +73,7 @@ class CardsScreen extends ConsumerWidget {
                     subtitle: Text(
                         '${fmtCents(c.balanceCents)} of '
                         '${fmtCents(c.creditLimitCents)}'),
-                    trailing: _cycleChip(context, c),
+                    trailing: null,
                     childrenPadding: const EdgeInsets.all(16),
                     expandedCrossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -93,18 +96,6 @@ class CardsScreen extends ConsumerWidget {
                                   '${c.annualFeeDate == null ? '' : ' — next '
                                       '${_fmtDate(HomebaseRepository.nextAnnualFeeDate(c)!)}'}'),
                       DetailRow('Monthly fee', fmtCents(c.monthlyFeeCents)),
-                      DetailRow(
-                          'Statement closes',
-                          c.statementCloseDay == null
-                              ? 'not set'
-                              : _fmtDate(HomebaseRepository.cycleFor(c)
-                                  .statementCloses!)),
-                      DetailRow(
-                          'Payment due',
-                          c.paymentDueDay == null
-                              ? 'not set'
-                              : _fmtDate(
-                                  HomebaseRepository.cycleFor(c).paymentDue!)),
                       TransactionHistory(
                           stream: repo.watchCardHistory(
                               profileId: profileId, cardId: c.id)),

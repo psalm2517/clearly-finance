@@ -24,7 +24,7 @@ mkdir -p "$deb_root/DEBIAN" "$deb_root/opt" "$deb_root/usr/bin" \
          "$deb_root/usr/share/applications"
 cp -r "$bundle" "$deb_root/opt/clearly"
 ln -s /opt/clearly/clearly "$deb_root/usr/bin/clearly"
-cp linux/packaging/dev.clearly.clearly.desktop "$deb_root/usr/share/applications/dev.clearly.clearly.desktop"
+cp linux/packaging/app.seeclearly.Clearly.desktop "$deb_root/usr/share/applications/app.seeclearly.Clearly.desktop"
 cp -r linux/packaging/icons "$deb_root/usr/share/icons"
 size_kb="$(du -sk "$deb_root" | cut -f1)"
 cat > "$deb_root/DEBIAN/control" <<EOF
@@ -66,19 +66,19 @@ HERE="$(dirname "$(readlink -f "$0")")"
 # put on the desktop like any installed app. Set CLEARLY_NO_INTEGRATE=1 to skip.
 if [ -n "$APPIMAGE" ] && [ -z "$CLEARLY_NO_INTEGRATE" ]; then
   data="${XDG_DATA_HOME:-$HOME/.local/share}"
-  desk="$data/applications/dev.clearly.clearly.desktop"
+  desk="$data/applications/app.seeclearly.Clearly.desktop"
   icon="$data/icons/hicolor/256x256/apps/clearly.png"
   if ! grep -qsF "Exec=\"$APPIMAGE\"" "$desk"; then
     mkdir -p "$data/applications" "$(dirname "$icon")"
     cp "$HERE/clearly.png" "$icon"
-    sed "s|^Exec=.*|Exec=\"$APPIMAGE\"|; s|^Icon=.*|Icon=$icon|" "$HERE/dev.clearly.clearly.desktop" > "$desk"
+    sed "s|^Exec=.*|Exec=\"$APPIMAGE\"|; s|^Icon=.*|Icon=$icon|" "$HERE/app.seeclearly.Clearly.desktop" > "$desk"
     command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$data/applications" 2>/dev/null
   fi
 fi
 exec "$HERE/clearly" "$@"
 EOF
 chmod +x "$appdir/AppRun"
-cp linux/packaging/dev.clearly.clearly.desktop "$appdir/dev.clearly.clearly.desktop"
+cp linux/packaging/app.seeclearly.Clearly.desktop "$appdir/app.seeclearly.Clearly.desktop"
 cp linux/packaging/icons/hicolor/256x256/apps/clearly.png "$appdir/clearly.png"
 cp "$appdir/clearly.png" "$appdir/.DirIcon"
 # The release asset is always named Clearly-x86_64.AppImage, so the download link

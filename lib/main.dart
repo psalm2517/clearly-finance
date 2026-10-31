@@ -30,6 +30,7 @@ final activeProfileProvider = StateProvider<Profile?>((ref) {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppDatabase.migratePreviousFolder();
   await NotificationService.instance.init();
   runApp(const ProviderScope(child: ClearlyApp()));
 }

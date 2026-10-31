@@ -78,7 +78,7 @@ by hand. A **Manual** profile never connects to anything.
 
 ## Your data
 
-Everything is stored in `~/.local/share/dev.clearly.clearly/clearly.sqlite`.
+Everything is stored in `~/.local/share/app.seeclearly.Clearly/clearly.sqlite`.
 Back up and restore from Settings. Backups are plain JSON, so keep them
 somewhere you trust.
 
