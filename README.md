@@ -25,7 +25,7 @@ computer.
   SimpleFIN ($1.50/month, paid to them).
 - **Accurate.** Transfers between your own accounts and card payments aren't
   counted as spending or income.
-  - **Local.** Your data never leaves your device.
+- **Local.** Your data never leaves your device.
 
 ## Features
 
