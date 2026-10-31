@@ -21,7 +21,7 @@ computer.
 ## Why Clearly
 
 - **Free.** No subscription, no account.
-- **Manual or synced.** Type things in, or connect your banks through
+- **Flexible.** Type things in manually, or connect your banks through
   SimpleFIN ($1.50/month, paid to them).
 - **Accurate.** Transfers between your own accounts and card payments aren't
   counted as spending or income.
