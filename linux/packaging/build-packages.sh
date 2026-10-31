@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the Linux release files from a clean release build:
 #   dist/clearly_<version>_amd64.deb
-#   dist/Clearly-<version>-x86_64.AppImage
+#   dist/Clearly-x86_64.AppImage  (+ .zsync when zsyncmake is installed)
 # Usage: linux/packaging/build-packages.sh   (run from the repo root)
 # The AppImage step needs appimagetool: set APPIMAGETOOL to its path, or it is
 # downloaded to dist/.cache.
@@ -81,7 +81,13 @@ chmod +x "$appdir/AppRun"
 cp linux/packaging/dev.clearly.clearly.desktop "$appdir/dev.clearly.clearly.desktop"
 cp linux/packaging/icons/hicolor/256x256/apps/clearly.png "$appdir/clearly.png"
 cp "$appdir/clearly.png" "$appdir/.DirIcon"
-ARCH=x86_64 "$tool" --appimage-extract-and-run "$appdir" \
-  "$dist/Clearly-${version}-x86_64.AppImage"
+# The release asset is always named Clearly-x86_64.AppImage, so the download link
+# and the update information never change. The update information lets
+# AppImageUpdate fetch only what changed; it needs the .zsync file uploaded
+# next to the AppImage (made here when zsyncmake is installed).
+ARCH=x86_64 "$tool" --appimage-extract-and-run \
+  -u "gh-releases-zsync|amandoti-win|clearly-finance|latest|Clearly-x86_64.AppImage.zsync" \
+  "$appdir" "$dist/Clearly-x86_64.AppImage"
+mv -f Clearly-x86_64.AppImage.zsync "$dist/" 2>/dev/null || true
 rm -rf "$appdir"
 ls -la "$dist"
