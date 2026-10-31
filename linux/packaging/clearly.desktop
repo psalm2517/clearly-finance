@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Clearly
+GenericName=Personal Finance
+Comment=See clearly. Free, local-first personal finance
+Exec=clearly
+Icon=clearly
+Terminal=false
+Categories=Office;Finance;
+Keywords=money;budget;finance;banking;
+StartupWMClass=dev.clearly.clearly

@@ -5,10 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/database.dart';
 import '../main.dart';
 import '../util/pin.dart';
+import '../widgets/clearly_mark.dart';
 import '../widgets/common.dart' show SyncModePicker, AmbientBackground;
 
-/// The name and tagline, in type only. There is deliberately no mark here
-/// until Clearly has a real logo.
+/// The mark, the name and the tagline.
 class _Wordmark extends StatelessWidget {
   const _Wordmark({this.size = 52});
   final double size;
@@ -19,23 +19,25 @@ class _Wordmark extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        ClearlyMark(height: size * 1.9),
+        SizedBox(height: size * 0.3),
         Text(
           'Clearly',
           style: TextStyle(
             fontSize: size,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -1.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -2,
             height: 1,
             color: scheme.onSurface,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Text(
           'See clearly.',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: 17,
             letterSpacing: 0.4,
-            color: scheme.primary,
+            color: scheme.tertiary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -157,7 +159,7 @@ class _Picker extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const _Wordmark(),
-            const SizedBox(height: 56),
+            const SizedBox(height: 48),
             Text(
               single ? 'Welcome back' : 'Who is this?',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -173,7 +175,8 @@ class _Picker extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.all(10),
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(20),
+                      hoverColor: scheme.primary.withValues(alpha: 0.08),
                       onTap: () => _select(context, ref, p),
                       child: Card(
                         margin: EdgeInsets.zero,
@@ -201,6 +204,25 @@ class _Picker extends ConsumerWidget {
                               Text(
                                 p.name,
                                 style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    p.isSynced ? Icons.sync : Icons.edit_note,
+                                    size: 14,
+                                    color: scheme.tertiary,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    p.isSynced ? 'Synced' : 'Manual',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
                               ),
                               if (p.pinHash != null)
                                 Padding(

@@ -11,6 +11,7 @@ import '../main.dart';
 import '../theme/catppuccin.dart';
 import '../theme/flavor_provider.dart';
 import '../widgets/add_transaction.dart';
+import '../widgets/clearly_mark.dart';
 import '../widgets/common.dart' show AmbientBackground;
 import 'accounts_hub.dart';
 import 'bank_sync.dart' show simpleFinClientProvider;
@@ -391,18 +392,7 @@ class AppSidebar extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
             child: Row(
               children: [
-                Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(7),
-                    gradient: LinearGradient(
-                      colors: [scheme.primary, scheme.secondary],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                ),
+                const ClearlyMark(height: 26),
                 const SizedBox(width: 10),
                 Text(
                   'Clearly',
