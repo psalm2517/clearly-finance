@@ -809,7 +809,7 @@ class _NetWorthHero extends StatelessWidget {
           )
         else
           HoverLineChart(
-            height: 140,
+            height: 200,
             dates: [for (final h in history) h.date],
             values: [for (final h in history) h.netWorthCents],
             painterBuilder: (hover) => NetWorthChartPainter(

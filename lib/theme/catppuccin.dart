@@ -322,7 +322,9 @@ ThemeData themeFor(
       helperMaxLines: 3,
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(
-      linearTrackColor: dark ? c.mantle : c.surface0.withValues(alpha: 0.5),
+      linearTrackColor: dark
+          ? Colors.white.withValues(alpha: 0.08)
+          : c.surface0.withValues(alpha: 0.5),
       linearMinHeight: 6,
       borderRadius: BorderRadius.circular(8),
     ),
