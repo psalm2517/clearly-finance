@@ -22,15 +22,11 @@ computer.
 
 ## Why Clearly
 
-- **Free, and nothing to sign up for.** No subscription, no account, no
-  company holding your transactions.
-- **Manual or synced, your choice.** Enter things yourself, or connect your
-  banks through SimpleFIN for $1.50/month or $15/year, paid to SimpleFIN and not to
-  Clearly. Each profile is one or the other, so the two never mix.
-- **The numbers are right.** A transfer to your own savings, or a card
-  payment, is not counted as spending and income. Most apps get that wrong.
-- **Simple on the surface.** Seven pages and nothing to configure before it
-  is useful.
+- **Free.** No subscription, no account.
+- **Manual or synced.** Type things in, or connect your banks through
+  SimpleFIN ($1.50/month, paid to them).
+- **Accurate.** Transfers between your own accounts and card payments aren't
+  counted as spending or income.
 
 ## Features
 
