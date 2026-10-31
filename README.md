@@ -15,7 +15,9 @@
 [![Version](https://img.shields.io/badge/version-0.7.0-informational.svg)](https://github.com/amandoti-win/clearly-finance/releases)
 [![Downloads](https://img.shields.io/github/downloads/amandoti-win/clearly-finance/total.svg)](https://github.com/amandoti-win/clearly-finance/releases)
 
-### [⬇ Download for Linux](https://github.com/amandoti-win/clearly-finance/releases/download/v0.7.0/clearly-linux-x64-v0.7.0.tar.gz)
+### [⬇ Download for Linux](https://github.com/amandoti-win/clearly-finance/releases/latest/download/Clearly-x86_64.AppImage)
+
+One file. Make it executable (right-click, Properties, Permissions), then double-click it.
 
 Free, open-source personal finance for the desktop. Your data stays on your
 computer.
