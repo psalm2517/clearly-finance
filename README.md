@@ -8,6 +8,7 @@
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Android-lightgrey.svg)](#building)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Version](https://img.shields.io/badge/version-0.7.0-informational.svg)](https://github.com/amandoti-win/clearly/releases)
+[![Downloads](https://img.shields.io/github/downloads/amandoti-win/clearly/total.svg)](https://github.com/amandoti-win/clearly/releases)
 
 ### [⬇ Download for Linux](https://github.com/amandoti-win/clearly/releases/download/v0.7.0/clearly-linux-x64-v0.7.0.tar.gz)
 
