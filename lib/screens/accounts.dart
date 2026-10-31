@@ -83,6 +83,7 @@ class AccountsScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       // A synced profile's accounts come from the bank.
       floatingActionButton:
           (ref.watch(activeProfileProvider)?.isSynced ?? false)

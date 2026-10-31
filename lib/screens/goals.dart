@@ -29,6 +29,7 @@ class GoalsScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(context, ref, null),
         icon: const Icon(Icons.add),

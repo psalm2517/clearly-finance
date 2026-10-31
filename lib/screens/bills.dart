@@ -85,6 +85,7 @@ class _BillsScreenState extends ConsumerState<BillsScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(null),
         icon: const Icon(Icons.add),
@@ -221,9 +222,12 @@ class _BillsScreenState extends ConsumerState<BillsScreen> {
   }
 
   Widget _monthBar(BuildContext context, {required int unpaidCount}) {
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest
-          .withValues(alpha: 0.35),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(

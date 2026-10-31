@@ -29,6 +29,7 @@ class RecurringTransactionsScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: StreamBuilder<List<dynamic>>(
         stream: combineLatest<dynamic>([
           repo.watchRecurringTransactions(profileId: profileId),

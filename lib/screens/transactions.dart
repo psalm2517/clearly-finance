@@ -48,6 +48,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [

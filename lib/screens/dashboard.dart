@@ -24,13 +24,15 @@ Widget _dashRow(Widget left, Widget right) {
       if (constraints.maxWidth < 820) {
         return Column(children: [left, kSectionGap, right]);
       }
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: left),
-          const SizedBox(width: 24),
-          Expanded(child: right),
-        ],
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: left),
+            const SizedBox(width: 24),
+            Expanded(child: right),
+          ],
+        ),
       );
     },
   );

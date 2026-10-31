@@ -162,6 +162,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (ref.watch(activeProfileProvider)?.isSynced ?? false) ...[
           const BankSyncSection(),
           kSectionGap,
+        ] else ...[
+          const SectionHeader('Bank sync', icon: Icons.sync_outlined),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.edit_note),
+              title: const Text('This is a Manual profile'),
+              subtitle: Text(
+                'Bank sync belongs to Synced profiles, so the bank and your '
+                'hand entries never mix. To connect SimpleFIN, add a Synced '
+                'profile${loggedIn.isAdmin ? ' under Household profiles' : ' (ask the admin)'}.',
+              ),
+            ),
+          ),
+          kSectionGap,
         ],
         SectionHeader('Backup',
             icon: Icons.save_outlined,

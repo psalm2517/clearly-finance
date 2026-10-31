@@ -19,6 +19,7 @@ class LoansScreen extends ConsumerWidget {
     final repo = ref.watch(repositoryProvider);
     final profileId = ref.watch(activeProfileProvider)!.id;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [

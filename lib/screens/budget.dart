@@ -39,6 +39,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: StreamBuilder<List<dynamic>>(
         stream: combineLatest<dynamic>([
           repo.watchBudgetForMonth(profileId: profileId, month: _month),
@@ -331,11 +332,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   }
 
   Widget _monthBar(BuildContext context) {
-    return Material(
-      color: Theme.of(context)
-          .colorScheme
-          .surfaceContainerHighest
-          .withValues(alpha: 0.35),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(

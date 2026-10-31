@@ -210,7 +210,9 @@ class PillTabs extends StatelessWidget {
     final dark = scheme.brightness == Brightness.dark;
     // Opaque, so nothing behind it shows through unevenly.
     final fill = Color.alphaBlend(
-      (dark ? Colors.white : Colors.black).withValues(alpha: dark ? 0.07 : 0.05),
+      (dark ? Colors.white : Colors.black).withValues(
+        alpha: dark ? 0.07 : 0.05,
+      ),
       Theme.of(context).scaffoldBackgroundColor,
     );
     return Container(
@@ -232,8 +234,10 @@ class PillTabs extends StatelessWidget {
                 borderRadius: BorderRadius.circular(18),
                 onTap: () => controller.animateTo(i),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: i == controller.index
                         ? scheme.primary.withValues(alpha: 0.18)
@@ -260,7 +264,11 @@ class PillTabs extends StatelessWidget {
 
 /// Choice between the two kinds of profile, made once when it is created.
 class SyncModePicker extends StatelessWidget {
-  const SyncModePicker({super.key, required this.value, required this.onChanged});
+  const SyncModePicker({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
 
   final String value;
   final ValueChanged<String> onChanged;
@@ -291,9 +299,9 @@ class SyncModePicker extends StatelessWidget {
         Text(
           value == 'synced'
               ? 'Accounts and transactions come from your bank through '
-                  'SimpleFIN. Nothing is typed in by hand.'
+                    'SimpleFIN. Nothing is typed in by hand.'
               : 'You enter transactions and balances yourself, or import a '
-                  'CSV. Nothing connects to a bank.',
+                    'CSV. Nothing connects to a bank.',
           style: TextStyle(color: muted, fontSize: 12.5, height: 1.4),
         ),
         const SizedBox(height: 4),
@@ -488,9 +496,11 @@ class StatCard extends StatelessWidget {
       child: GlassCard(
         tint: color,
         child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 28,
+              child: Row(
                 children: [
                   Icon(icon, size: 16, color: color),
                   const SizedBox(width: 6),
@@ -507,26 +517,34 @@ class StatCard extends StatelessWidget {
                   ?info,
                 ],
               ),
-              const SizedBox(height: 10),
-              // Bigger and bolder than the label above it — a clear weight
-              // difference between a headline figure and its caption,
-              // rather than everything at similar weight.
-              MoneyText(
-                value,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.w300,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+            ),
+            const SizedBox(height: 6),
+            // Bigger and bolder than the label above it — a clear weight
+            // difference between a headline figure and its caption,
+            // rather than everything at similar weight.
+            MoneyText(
+              value,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w300,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
-              if (note != null)
-                Text(
-                  note!,
-                  style: Theme.of(context).textTheme.bodySmall
-                      ?.copyWith(color: color),
-                ),
-            ],
-          ),
+            ),
+            // The note line is always reserved, so a row of tiles stays one
+            // height whether or not each has a note.
+            SizedBox(
+              height: 18,
+              child: note == null
+                  ? null
+                  : Text(
+                      note!,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: color),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

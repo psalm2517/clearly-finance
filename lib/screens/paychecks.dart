@@ -38,6 +38,7 @@ class _PaychecksScreenState extends ConsumerState<PaychecksScreen> {
     final repo = ref.watch(repositoryProvider);
     final profileId = ref.watch(activeProfileProvider)!.id;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SingleChildScrollView(
         padding: kPagePadding,
         child: Column(
