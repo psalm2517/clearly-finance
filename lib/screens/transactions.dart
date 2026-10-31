@@ -44,6 +44,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   Widget build(BuildContext context) {
     final repo = ref.watch(repositoryProvider);
     final profileId = ref.watch(activeProfileProvider)!.id;
+    final synced = ref.watch(activeProfileProvider)!.isSynced;
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -59,21 +60,23 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               label: const Text('Export'),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: FloatingActionButton.extended(
-              heroTag: 'importHistory',
-              onPressed: () => _showImportHistory(context, profileId),
-              icon: const Icon(Icons.history),
-              label: const Text('Imports'),
+          if (!synced)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: FloatingActionButton.extended(
+                heroTag: 'importHistory',
+                onPressed: () => _showImportHistory(context, profileId),
+                icon: const Icon(Icons.history),
+                label: const Text('Imports'),
+              ),
             ),
-          ),
-          FloatingActionButton.extended(
-            heroTag: 'importCsv',
-            onPressed: () => _importCsv(context),
-            icon: const Icon(Icons.file_upload_outlined),
-            label: const Text('Import CSV'),
-          ),
+          if (!synced)
+            FloatingActionButton.extended(
+              heroTag: 'importCsv',
+              onPressed: () => _importCsv(context),
+              icon: const Icon(Icons.file_upload_outlined),
+              label: const Text('Import CSV'),
+            ),
         ],
       ),
       body: StreamBuilder<List<dynamic>>(

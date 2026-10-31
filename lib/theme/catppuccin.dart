@@ -49,18 +49,18 @@ final Flavor _obsidian = (
   sapphire: catppuccin.mocha.sapphire,
   blue: catppuccin.mocha.blue,
   lavender: catppuccin.mocha.lavender,
-  text: const Color(0xFFEDEDED),
-  subtext1: const Color(0xFFB8B8B8),
-  subtext0: const Color(0xFF9E9E9E),
-  overlay2: const Color(0xFF6B6B6B),
-  overlay1: const Color(0xFF525252),
-  overlay0: const Color(0xFF3D3D3D),
-  surface2: const Color(0xFF2A2A2A),
-  surface1: const Color(0xFF1F1F1F),
-  surface0: const Color(0xFF161616),
-  crust: const Color(0xFF000000),
-  mantle: const Color(0xFF0A0A0A),
-  base: const Color(0xFF0D0D0D),
+  text: const Color(0xFFEDEDF2),
+  subtext1: const Color(0xFFBBBBC4),
+  subtext0: const Color(0xFF9696A1),
+  overlay2: const Color(0xFF6C6C78),
+  overlay1: const Color(0xFF535360),
+  overlay0: const Color(0xFF3E3E49),
+  surface2: const Color(0xFF282832),
+  surface1: const Color(0xFF1E1E26),
+  surface0: const Color(0xFF15151B),
+  crust: const Color(0xFF030305),
+  mantle: const Color(0xFF08080B),
+  base: const Color(0xFF0B0B0F),
 );
 
 /// The five flavors, in the order the project lists them: lightest to
@@ -181,7 +181,7 @@ extension CatppuccinAccentInfo on CatppuccinAccent {
   static CatppuccinAccent fromStorage(String? key) =>
       CatppuccinAccent.values.firstWhere(
         (a) => a.name == key,
-        orElse: () => CatppuccinAccent.mauve, // the app's original accent
+        orElse: () => CatppuccinAccent.lavender, // default for new installs
       );
 }
 
@@ -189,7 +189,7 @@ extension CatppuccinAccentInfo on CatppuccinAccent {
 /// palette, so screens never need to know which flavor or accent is active.
 ThemeData themeFor(
   CatppuccinFlavor flavor, [
-  CatppuccinAccent accent = CatppuccinAccent.mauve,
+  CatppuccinAccent accent = CatppuccinAccent.lavender,
 ]) {
   final c = flavor.palette;
   final dark = flavor.isDark;
@@ -204,6 +204,16 @@ ThemeData themeFor(
   final cardColor = dark ? c.surface0 : c.base;
   final borderColor = dark ? c.surface1 : c.surface0;
   final onAccent = dark ? c.mantle : c.base;
+
+  // Glass: surfaces are translucent, so the ambient glow behind the page
+  // (see AmbientBackground) shows through them. A hairline border does the
+  // separating, rather than a heavier fill or a shadow.
+  final glassFill = dark
+      ? Colors.white.withValues(alpha: 0.045)
+      : Colors.white.withValues(alpha: 0.62);
+  final hairline = dark
+      ? Colors.white.withValues(alpha: 0.09)
+      : Colors.black.withValues(alpha: 0.08);
 
   final scheme = ColorScheme(
     brightness: dark ? Brightness.dark : Brightness.light,
@@ -233,27 +243,47 @@ ThemeData themeFor(
     outlineVariant: borderColor.withValues(alpha: 0.5),
   );
 
+  final base = ThemeData(brightness: dark ? Brightness.dark : Brightness.light);
+  final t = base.textTheme;
   return ThemeData(
     useMaterial3: true,
+    // Big figures are light and tight; labels are small and quiet. Weight
+    // contrast, not colour, carries the hierarchy.
+    textTheme: t.copyWith(
+      displaySmall: t.displaySmall?.copyWith(
+        fontWeight: FontWeight.w300,
+        letterSpacing: -1.2,
+      ),
+      headlineMedium: t.headlineMedium?.copyWith(
+        fontWeight: FontWeight.w300,
+        letterSpacing: -0.6,
+      ),
+      titleMedium: t.titleMedium?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.1,
+      ),
+    ),
     colorScheme: scheme,
     scaffoldBackgroundColor: pageColor,
     cardTheme: CardThemeData(
-      color: cardColor,
+      color: glassFill,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 8),
-      // Cards float on background contrast alone, rather than a drawn
-      // stroke — a bigger radius and no border reads as softer and less
-      // boxy than the old 12px bordered rectangle.
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: hairline),
+      ),
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: dark ? c.mantle : c.base,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
       foregroundColor: c.text,
       elevation: 0,
       scrolledUnderElevation: 0,
     ),
     navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: dark ? c.mantle : c.base,
+      backgroundColor: Colors.transparent,
       indicatorColor: accentColor.withValues(alpha: 0.22),
       indicatorShape: const StadiumBorder(),
       selectedIconTheme: IconThemeData(color: accentColor),
@@ -264,8 +294,8 @@ ThemeData themeFor(
       ),
       unselectedLabelTextStyle: TextStyle(color: c.subtext0),
     ),
-    dividerTheme: DividerThemeData(color: borderColor, thickness: 1),
-    dividerColor: borderColor,
+    dividerTheme: DividerThemeData(color: hairline, thickness: 1),
+    dividerColor: hairline,
     listTileTheme: ListTileThemeData(
       iconColor: c.subtext0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

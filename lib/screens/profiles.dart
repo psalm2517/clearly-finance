@@ -196,6 +196,7 @@ class _ProfilesScreenState extends ConsumerState<ProfilesScreen> {
     final name = TextEditingController(text: existing?.name);
     final pin = TextEditingController();
     var isAdmin = existing?.isAdmin ?? false;
+    var mode = existing?.syncMode ?? 'manual';
     var clearPin = false;
 
     final saved = await showDialog<bool>(
@@ -209,6 +210,25 @@ class _ProfilesScreenState extends ConsumerState<ProfilesScreen> {
             width: 380,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               DialogField(name, 'Name', autofocus: true),
+              if (existing == null) ...[
+                SyncModePicker(
+                    value: mode, onChanged: (v) => setLocal(() => mode = v)),
+                const SizedBox(height: 12),
+              ] else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Chip(
+                      avatar: Icon(
+                          existing.isSynced ? Icons.sync : Icons.edit_note,
+                          size: 16),
+                      label: Text(existing.isSynced
+                          ? 'Synced profile'
+                          : 'Manual profile'),
+                    ),
+                  ),
+                ),
               TextField(
                 controller: pin,
                 obscureText: true,
@@ -261,6 +281,7 @@ class _ProfilesScreenState extends ConsumerState<ProfilesScreen> {
       await repo.createProfile(ProfilesCompanion.insert(
         name: name.text.trim(),
         isAdmin: Value(isAdmin),
+        syncMode: Value(mode),
         pinHash: Value(pin.text.isEmpty ? null : hashPin(pin.text)),
       ));
     } else {

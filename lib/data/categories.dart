@@ -15,12 +15,11 @@ class Cat {
   static const auto = 'Transportation';
   static const financial = 'Financial Services';
   static const medical = 'Medical & Healthcare';
-  static const personal = 'Personal';
+  static const personal = 'Personal, Family & Pets';
   static const entertainment = 'Entertainment';
   static const subscriptions = 'Subscriptions & Software';
   static const travel = 'Travel';
   static const education = 'Education';
-  static const family = 'Family & Pets';
   static const gifts = 'Gifts & Donations';
   static const taxes = 'Taxes & Government';
   static const transfers = 'Transfers';
@@ -44,7 +43,9 @@ const Map<String, String> categoryHints = {
   Cat.financial:
       'Insurance, bank and ATM fees, interest, loan and car payments',
   Cat.medical: 'Doctor, dentist, vision, pharmacy, urgent care, vet',
-  Cat.personal: 'Shopping, clothing, salon, barber, gym, personal care',
+  Cat.personal:
+      'Shopping, clothing, salon, gym, personal care, childcare, kids, pet '
+      'food and supplies',
   Cat.entertainment:
       'One-off fun: games (Steam), movies, events, tickets, betting',
   Cat.subscriptions:
@@ -52,13 +53,46 @@ const Map<String, String> categoryHints = {
       'Netflix), cloud, hosting, AI tools, apps, VPN',
   Cat.travel: 'Flights, hotels, rentals, trips',
   Cat.education: 'Tuition, books, courses',
-  Cat.family: 'Childcare, kids, pet food and supplies',
   Cat.gifts: 'Gifts and charity',
   Cat.taxes: 'Taxes, fines, government fees',
+  Cat.paycheck: 'Wages and salary from an employer',
+  Cat.interest: 'Interest on savings, dividends',
+  Cat.refunds: 'Returns, refunds, cash back, money paid back to you',
+  Cat.otherIncome: 'Anything else that came in: gifts, Zelle, side income',
   Cat.transfers:
       'Money moving between your own accounts and brokerage deposits. '
       'Not counted as income or spending',
 };
+
+/// Income categories, in the order they are offered.
+const defaultIncomeCategories = <String>[
+  Cat.paycheck,
+  Cat.interest,
+  Cat.refunds,
+  Cat.otherIncome,
+];
+
+/// What the statement wording says an incoming amount is, when nothing more
+/// specific (the person's own rules, a scheduled paycheck) already decided.
+/// Null when the wording says nothing.
+String? incomeCategoryFromText(String text) {
+  final t = text.toLowerCase();
+  if (RegExp(r'payroll|direct dep|salary|paychk|paycheck').hasMatch(t)) {
+    return Cat.paycheck;
+  }
+  if (RegExp(r'dividend|interest (payment|paid|earned|credit)|'
+          r'\binterest\b')
+      .hasMatch(t)) {
+    return Cat.interest;
+  }
+  if (RegExp(r'refund|reimburs|reversal|chargeback|cash ?back').hasMatch(t)) {
+    return Cat.refunds;
+  }
+  if (RegExp(r'zelle|venmo|cash app|paypal|apple cash').hasMatch(t)) {
+    return Cat.otherIncome;
+  }
+  return null;
+}
 
 /// Spending categories in the order they are offered.
 const defaultSpendingCategories = <String>[
@@ -74,7 +108,6 @@ const defaultSpendingCategories = <String>[
   Cat.subscriptions,
   Cat.travel,
   Cat.education,
-  Cat.family,
   Cat.gifts,
   Cat.taxes,
   Cat.transfers,
@@ -85,6 +118,8 @@ const defaultSpendingCategories = <String>[
 /// Applied once to bank entries only, so a category the person chose
 /// themselves is never renamed.
 const legacyCategoryNames = <String, String>{
+  'Personal': Cat.personal,
+  'Family & Pets': Cat.personal,
   'Dining': Cat.food,
   'Gas': Cat.auto,
   'Auto': Cat.auto,
@@ -107,8 +142,23 @@ const legacyCategoryNames = <String, String>{
 /// person's own alphabetically. Used wherever a category is chosen so the
 /// list is always in the same, findable order.
 ({List<String> builtIn, List<String> yours}) orderedCategories(
-  Iterable<String> used,
-) {
+  Iterable<String> used, {
+  bool income = false,
+}) {
+  if (income) {
+    final yours = {
+      for (final c in used)
+        if (!defaultIncomeCategories.contains(c) &&
+            !defaultSpendingCategories.contains(c) &&
+            c != 'Split' &&
+            c.trim().isNotEmpty)
+          c,
+    }.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return (
+      builtIn: [...defaultIncomeCategories]..sort(),
+      yours: yours,
+    );
+  }
   final builtIn = [
     for (final c in defaultSpendingCategories)
       if (c != Cat.other) c,

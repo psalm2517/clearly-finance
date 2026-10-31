@@ -471,7 +471,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   Widget _planRow(BuildContext context, String label, String value,
       {bool bold = false, Color? color}) {
     final style = TextStyle(
-        fontWeight: bold ? FontWeight.bold : null, color: color);
+        fontWeight: bold ? FontWeight.w600 : null, color: color);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(

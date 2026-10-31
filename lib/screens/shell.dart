@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database.dart';
@@ -10,6 +11,7 @@ import '../main.dart';
 import '../theme/catppuccin.dart';
 import '../theme/flavor_provider.dart';
 import '../widgets/add_transaction.dart';
+import '../widgets/common.dart' show AmbientBackground;
 import 'accounts_hub.dart';
 import 'bank_sync.dart' show simpleFinClientProvider;
 import 'budget.dart';
@@ -69,8 +71,9 @@ class _AppShellState extends ConsumerState<AppShell>
     _syncing = true;
     try {
       final repo = ref.read(repositoryProvider);
-      final connections =
-          await repo.watchSimpleFinConnections(profileId: profile.id).first;
+      final connections = await repo
+          .watchSimpleFinConnections(profileId: profile.id)
+          .first;
       if (connections.isEmpty) return;
       final owed = connections.any((c) => dailySyncDue(now, c.lastSyncAt));
       if (!owed) return;
@@ -91,8 +94,7 @@ class _AppShellState extends ConsumerState<AppShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _poll = Timer.periodic(
-        const Duration(minutes: 5), (_) => _syncIfDue());
+    _poll = Timer.periodic(const Duration(minutes: 5), (_) => _syncIfDue());
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncIfDue());
   }
 
@@ -162,103 +164,73 @@ class _AppShellState extends ConsumerState<AppShell>
 
     final dest = ref.watch(navProvider);
 
+    return Shortcuts(
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.tab): _StepDestIntent(1),
+        SingleActivator(LogicalKeyboardKey.tab, shift: true): _StepDestIntent(
+          -1,
+        ),
+      },
+      child: Actions(
+        actions: {_StepDestIntent: _StepDestAction(ref)},
+        child: Focus(
+          autofocus: true,
+          child: _shell(context, ref, dest, flavor, loggedIn, active),
+        ),
+      ),
+    );
+  }
+
+  Widget _shell(
+    BuildContext context,
+    WidgetRef ref,
+    Dest dest,
+    CatppuccinFlavor flavor,
+    Profile loggedIn,
+    Profile active,
+  ) {
+    return ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: AmbientBackground(
+        child: _scaffold(context, ref, dest, flavor, loggedIn, active),
+      ),
+    );
+  }
+
+  Widget _scaffold(
+    BuildContext context,
+    WidgetRef ref,
+    Dest dest,
+    CatppuccinFlavor flavor,
+    Profile loggedIn,
+    Profile active,
+  ) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        shape: Border(
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
+        ),
         title: Text(dest.title),
         actions: [
-          // The one place to record money, from any screen.
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: FilledButton.icon(
-              onPressed: () => showAddTransaction(context, ref),
-              icon: const Icon(Icons.add),
-              label: const Text('Add'),
+          // The one place to record money, from any screen. A synced
+          // profile has none: the bank is its only source.
+          if (!active.isSynced)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: FilledButton.icon(
+                onPressed: () => showAddTransaction(context, ref),
+                icon: const Icon(Icons.add),
+                label: const Text('Add'),
+              ),
             ),
-          ),
           if (loggedIn.isAdmin) _ProfileSwitcher(active: active),
-          IconButton(
-            tooltip: flavor.isDark
-                ? 'Switch to light mode'
-                : 'Switch to dark mode',
-            icon: Icon(
-              flavor.isDark
-                  ? Icons.light_mode_outlined
-                  : Icons.dark_mode_outlined,
-            ),
-            onPressed: () =>
-                ref.read(flavorProvider.notifier).toggleLightDark(),
-          ),
-          IconButton(
-            tooltip: 'Log out',
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              ref.read(navProvider.notifier).state = Dest.dashboard;
-              ref.read(loggedInProfileProvider.notifier).state = null;
-              ref.invalidate(activeProfileProvider);
-            },
-          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Row(
         children: [
-          NavigationRail(
-            // The app's name, so nothing on screen leaves you wondering what
-            // this is. Type only; there is no logo yet.
-            leading: Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 20),
-              child: Text(
-                'Clearly',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.4,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ),
-            selectedIndex: dest.index,
-            onDestinationSelected: (i) =>
-                ref.read(navProvider.notifier).state = Dest.values[i],
-            labelType: NavigationRailLabelType.all,
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.space_dashboard_outlined),
-                selectedIcon: Icon(Icons.space_dashboard),
-                label: Text('Dashboard'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.account_balance_outlined),
-                selectedIcon: Icon(Icons.account_balance),
-                label: Text('Accounts'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.swap_horiz_outlined),
-                selectedIcon: Icon(Icons.swap_horiz),
-                label: Text('Transactions'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.alt_route_outlined),
-                selectedIcon: Icon(Icons.alt_route),
-                label: Text('Cash Flow'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.pie_chart_outline),
-                selectedIcon: Icon(Icons.pie_chart),
-                label: Text('Budget'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.autorenew_outlined),
-                selectedIcon: Icon(Icons.autorenew),
-                label: Text('Recurring'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: Text('Settings'),
-              ),
-            ],
-          ),
-          const VerticalDivider(width: 1),
+          AppSidebar(active: active, flavor: flavor),
           Expanded(
             child: LazyIndexedStack(
               index: dest.index,
@@ -313,5 +285,202 @@ class _ProfileSwitcher extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+const _navIcons = <Dest, (IconData, IconData)>{
+  Dest.dashboard: (Icons.space_dashboard_outlined, Icons.space_dashboard),
+  Dest.accounts: (Icons.account_balance_outlined, Icons.account_balance),
+  Dest.transactions: (Icons.swap_horiz_outlined, Icons.swap_horiz),
+  Dest.cashFlow: (Icons.alt_route_outlined, Icons.alt_route),
+  Dest.budget: (Icons.pie_chart_outline, Icons.pie_chart),
+  Dest.recurring: (Icons.autorenew_outlined, Icons.autorenew),
+  Dest.settings: (Icons.settings_outlined, Icons.settings),
+};
+
+/// The left sidebar: wordmark, destinations as icon + label rows, and the
+/// profile's mode, theme and log out at the foot.
+class AppSidebar extends ConsumerWidget {
+  const AppSidebar({required this.active, required this.flavor});
+
+  final Profile active;
+  final CatppuccinFlavor flavor;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final selected = ref.watch(navProvider);
+    final muted = scheme.onSurfaceVariant;
+
+    Widget item(Dest d) {
+      final on = d == selected;
+      final (off, onIcon) = _navIcons[d]!;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 1.5),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => ref.read(navProvider.notifier).state = d,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: on
+                  ? scheme.primary.withValues(alpha: 0.16)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  on ? onIcon : off,
+                  size: 19,
+                  color: on ? scheme.primary : muted,
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    d.title,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+                      color: on ? scheme.onSurface : muted,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget footerButton(IconData icon, String label, VoidCallback onTap) =>
+        InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: muted),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13.5, color: muted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+
+    return Container(
+      width: 216,
+      padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+            child: Row(
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(7),
+                    gradient: LinearGradient(
+                      colors: [scheme.primary, scheme.secondary],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Clearly',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.4,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          for (final d in Dest.values) item(d),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: Row(
+              children: [
+                Icon(
+                  active.isSynced ? Icons.sync : Icons.edit_note,
+                  size: 15,
+                  color: muted,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${active.name} · ${active.isSynced ? 'Synced' : 'Manual'}',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: muted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          footerButton(
+            flavor.isDark
+                ? Icons.light_mode_outlined
+                : Icons.dark_mode_outlined,
+            flavor.isDark ? 'Light mode' : 'Dark mode',
+            () => ref.read(flavorProvider.notifier).toggleLightDark(),
+          ),
+          footerButton(Icons.logout, 'Log out', () {
+            ref.read(navProvider.notifier).state = Dest.dashboard;
+            ref.read(loggedInProfileProvider.notifier).state = null;
+            ref.invalidate(activeProfileProvider);
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tab and Shift+Tab step through the sidebar destinations.
+class _StepDestIntent extends Intent {
+  const _StepDestIntent(this.delta);
+  final int delta;
+}
+
+class _StepDestAction extends Action<_StepDestIntent> {
+  _StepDestAction(this.ref);
+  final WidgetRef ref;
+
+  // While typing in a field Tab keeps its usual job of moving between
+  // fields, so the shortcut stands aside and the key passes through.
+  @override
+  bool isEnabled(_StepDestIntent intent) {
+    final ctx = FocusManager.instance.primaryFocus?.context;
+    return ctx == null ||
+        ctx.findAncestorWidgetOfExactType<EditableText>() == null;
+  }
+
+  @override
+  Object? invoke(_StepDestIntent intent) {
+    const all = Dest.values;
+    final i = ref.read(navProvider).index;
+    ref.read(navProvider.notifier).state =
+        all[(i + intent.delta + all.length) % all.length];
+    return null;
   }
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:csv/csv.dart';
 import 'package:drift/drift.dart';
 
+import '../util/money.dart';
 import '../util/streams.dart';
 import 'csv_import.dart';
 import 'database.dart';
@@ -14,6 +15,7 @@ import 'simplefin.dart';
 import 'transaction_draft.dart';
 
 part 'simplefin_repository.dart';
+part 'brief_repository.dart';
 
 /// One kind of activity seen in [HomebaseRepository.watchAccountHistory] and
 /// [HomebaseRepository.watchCardHistory].
@@ -89,6 +91,17 @@ class HomebaseRepository {
   // ---- Profiles ----
 
   Future<List<Profile>> allProfiles() => _db.select(_db.profiles).get();
+
+  /// Hand entry belongs to manual profiles only. A synced profile gets its
+  /// transactions from the bank and nothing else, so the two sources never
+  /// mix.
+  Future<void> _requireManualProfile(int profileId) async {
+    final p = await profileById(profileId);
+    if (p != null && p.isSynced) {
+      throw StateError('This is a synced profile, so its transactions come '
+          'from your bank. Use a manual profile to enter them by hand.');
+    }
+  }
 
   Future<Profile?> profileById(int id) => (_db.select(
     _db.profiles,
@@ -2728,17 +2741,17 @@ class HomebaseRepository {
   Future<int> _getOrCreateTagId({
     required int profileId,
     required String name,
-  }) {
-    final entry = TagsCompanion.insert(profileId: profileId, name: name);
+  }) async {
+    // Look first: an insert that hits the unique key reports the id of the
+    // last row inserted anywhere, not the existing tag's, which then fails
+    // the foreign key when it is linked.
+    final existing = await (_db.select(_db.tags)
+          ..where((t) => t.profileId.equals(profileId) & t.name.equals(name)))
+        .getSingleOrNull();
+    if (existing != null) return existing.id;
     return _db
         .into(_db.tags)
-        .insert(
-          entry,
-          onConflict: DoUpdate(
-            (_) => entry,
-            target: [_db.tags.profileId, _db.tags.name],
-          ),
-        );
+        .insert(TagsCompanion.insert(profileId: profileId, name: name));
   }
 
   /// Replaces the tags on a budget entry with exactly [tagNames] — creating
@@ -3079,6 +3092,8 @@ class HomebaseRepository {
     required TransactionDraft draft,
     DateTime? now,
   }) async {
+    // A schedule is a plan and fine anywhere; a one-off is a ledger entry.
+    if (!draft.repeats) await _requireManualProfile(profileId);
     final n = now ?? DateTime.now();
     final today = DateTime(n.year, n.month, n.day);
     final day = DateTime(draft.date.year, draft.date.month, draft.date.day);
@@ -3753,6 +3768,7 @@ class HomebaseRepository {
     required int accountId,
     required List<ParsedImportRow> rows,
   }) async {
+    await _requireManualProfile(profileId);
     if (await isSimpleFinLinked(FeedTarget.account, accountId)) {
       throw StateError('That account is synced with your bank, so there is '
           'nothing to import into it.');
@@ -3792,6 +3808,7 @@ class HomebaseRepository {
     required List<ParsedImportRow> rows,
     required bool updateAccountBalance,
   }) async {
+    await _requireManualProfile(profileId);
     if (await isSimpleFinLinked(FeedTarget.account, accountId)) {
       throw StateError('That account is synced with your bank, so there is '
           'nothing to import into it.');

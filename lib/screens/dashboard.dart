@@ -11,6 +11,7 @@ import '../widgets/common.dart';
 import '../widgets/hover_line_chart.dart';
 import '../widgets/net_worth_chart.dart';
 import 'accounts.dart' show accountIcon, accountTypeColor;
+import 'dashboard_brief.dart';
 import 'nav.dart';
 
 /// Two dashboard sections side by side on a wide window instead of always
@@ -47,104 +48,6 @@ class DashboardScreen extends ConsumerWidget {
     return ListView(
       padding: kPagePadding,
       children: [
-        FutureBuilder<List<Reminder>>(
-          future: repo.upcomingReminders(profileId: profileId),
-          builder: (context, snap) {
-            final reminders = snap.data ?? [];
-            if (reminders.isEmpty) return const SizedBox.shrink();
-            final now = DateTime.now();
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SectionHeader(
-                  'Coming up',
-                  icon: Icons.notifications_active_outlined,
-                  info: const InfoButton(
-                    title: 'Coming up',
-                    body: [
-                      'Anything needing attention in the next few days: '
-                          'unpaid bills coming due, and card or loan '
-                          'payments approaching.',
-                      'Autopay bills are left out — there is nothing for '
-                          'you to do about them, and they mark themselves '
-                          'paid once their date passes.',
-                      'Credit card annual fees appear 14 days ahead rather '
-                          'than three. They are large, come once a year, '
-                          'and are worth deciding about — keep the card or '
-                          'cancel before it charges — while there is still '
-                          'time to act.',
-                      'A desktop notification is also shown when Clearly '
-                          'opens and finds something due. Notifications '
-                          'cannot fire while the app is closed, so treat '
-                          'this panel as the reliable version.',
-                    ],
-                  ),
-                ),
-                Card(
-                  color: scheme.errorContainer.withValues(alpha: 0.25),
-                  child: Column(
-                    children: [
-                      for (final r in reminders)
-                        ListTile(
-                          leading: Icon(switch (r.kind) {
-                            ReminderKind.bill => Icons.receipt_long_outlined,
-                            ReminderKind.cardPayment => Icons.credit_card,
-                            ReminderKind.loanPayment =>
-                              Icons.request_quote_outlined,
-                            ReminderKind.annualFee => Icons.event_repeat,
-                          }, color: scheme.error),
-                          title: Row(
-                            children: [
-                              Flexible(child: Text(r.title)),
-                              if (r.kind == ReminderKind.annualFee) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: scheme.error.withValues(alpha: 0.18),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    'Annual fee',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: scheme.error,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          subtitle: Text(
-                            switch (r.daysUntil(now)) {
-                                  <= 0 => 'Due today',
-                                  1 => 'Due tomorrow',
-                                  final d =>
-                                    'Due in $d days — the '
-                                        '${ordinalDay(r.date.day)}',
-                                } +
-                                (r.kind == ReminderKind.annualFee
-                                    ? ' • worth deciding whether to keep the '
-                                          'card'
-                                    : ''),
-                          ),
-                          trailing: Text(
-                            fmtCents(r.amountCents),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                kSectionGap,
-              ],
-            );
-          },
-        ),
         StreamBuilder<({int assetsCents, int debtsCents, int netCents})>(
           stream: repo.watchNetWorth(profileId: profileId),
           builder: (context, snap) {
@@ -271,10 +174,8 @@ class DashboardScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                // No card wrapper here, deliberately: the hero number and
-                // chart sit directly on the page background, full-bleed,
-                // rather than boxed — the one place a bordered container
-                // would compete with the thing it's the whole page for.
+                // The one glass hero on the page; everything else is a
+                // plain hairline card.
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: history.isEmpty
@@ -286,12 +187,14 @@ class DashboardScreen extends ConsumerWidget {
                               'Clearly starts recording your net worth.',
                         )
                       : _dashRow(
-                          _NetWorthHero(
-                            last: last!,
-                            history: history,
-                            change: change,
-                            changePercent: changePercent,
-                            scheme: scheme,
+                          GlassCard(
+                            child: _NetWorthHero(
+                              last: last!,
+                              history: history,
+                              change: change,
+                              changePercent: changePercent,
+                              scheme: scheme,
+                            ),
                           ),
                           StreamBuilder<
                             ({int assetsCents, int debtsCents, int netCents})
@@ -332,6 +235,107 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                         ),
                 ),
+              ],
+            );
+          },
+        ),
+        kSectionGap,
+        DashboardBriefSection(profileId: profileId),
+        kSectionGap,
+        FutureBuilder<List<Reminder>>(
+          future: repo.upcomingReminders(profileId: profileId),
+          builder: (context, snap) {
+            final reminders = snap.data ?? [];
+            if (reminders.isEmpty) return const SizedBox.shrink();
+            final now = DateTime.now();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionHeader(
+                  'Coming up',
+                  icon: Icons.notifications_active_outlined,
+                  info: const InfoButton(
+                    title: 'Coming up',
+                    body: [
+                      'Anything needing attention in the next few days: '
+                          'unpaid bills coming due, and card or loan '
+                          'payments approaching.',
+                      'Autopay bills are left out — there is nothing for '
+                          'you to do about them, and they mark themselves '
+                          'paid once their date passes.',
+                      'Credit card annual fees appear 14 days ahead rather '
+                          'than three. They are large, come once a year, '
+                          'and are worth deciding about — keep the card or '
+                          'cancel before it charges — while there is still '
+                          'time to act.',
+                      'A desktop notification is also shown when Clearly '
+                          'opens and finds something due. Notifications '
+                          'cannot fire while the app is closed, so treat '
+                          'this panel as the reliable version.',
+                    ],
+                  ),
+                ),
+                Card(
+                  color: scheme.errorContainer.withValues(alpha: 0.25),
+                  child: Column(
+                    children: [
+                      for (final r in reminders)
+                        ListTile(
+                          leading: Icon(switch (r.kind) {
+                            ReminderKind.bill => Icons.receipt_long_outlined,
+                            ReminderKind.cardPayment => Icons.credit_card,
+                            ReminderKind.loanPayment =>
+                              Icons.request_quote_outlined,
+                            ReminderKind.annualFee => Icons.event_repeat,
+                          }, color: scheme.error),
+                          title: Row(
+                            children: [
+                              Flexible(child: Text(r.title)),
+                              if (r.kind == ReminderKind.annualFee) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: scheme.error.withValues(alpha: 0.18),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    'Annual fee',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: scheme.error,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          subtitle: Text(
+                            switch (r.daysUntil(now)) {
+                                  <= 0 => 'Due today',
+                                  1 => 'Due tomorrow',
+                                  final d =>
+                                    'Due in $d days — the '
+                                        '${ordinalDay(r.date.day)}',
+                                } +
+                                (r.kind == ReminderKind.annualFee
+                                    ? ' • worth deciding whether to keep the '
+                                          'card'
+                                    : ''),
+                          ),
+                          trailing: Text(
+                            fmtCents(r.amountCents),
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                kSectionGap,
               ],
             );
           },
@@ -512,7 +516,7 @@ class DashboardScreen extends ConsumerWidget {
                                         '${s.score}',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          fontWeight: FontWeight.w700,
+                                          fontWeight: FontWeight.w600,
                                           color: scheme.primary,
                                         ),
                                       ),
@@ -772,7 +776,7 @@ class _NetWorthHero extends StatelessWidget {
         MoneyText(
           fmtCents(last.netWorthCents),
           style: Theme.of(context).textTheme.displaySmall
-              ?.copyWith(fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()]),
+              ?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
         ),
         const SizedBox(height: 4),
         if (history.length < 2)
@@ -843,73 +847,86 @@ class _AssetsDebtBreakdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = net.assetsCents + net.debtsCents;
     final assetsRatio = total == 0 ? 0.5 : net.assetsCents / total;
-    return Column(
+    final pctAssets = (assetsRatio * 100).round();
+    Widget legend(Color c, String label, int cents, String note) => Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 12.5, color: scheme.onSurfaceVariant)),
+                    MoneyText(
+                      fmtCents(cents),
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w500,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(note,
+                  style:
+                      TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+            ],
+          ),
+        );
+    return GlassCard(
+      tint: scheme.secondary,
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Made up of',
-          style: Theme.of(context).textTheme.bodySmall
-              ?.copyWith(color: scheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 12),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: SizedBox(
-            height: 8,
-            child: Row(
-              children: [
-                Expanded(
-                  flex: (assetsRatio * 1000).round().clamp(1, 999),
-                  child: Container(color: scheme.secondary),
-                ),
-                Expanded(
-                  flex: ((1 - assetsRatio) * 1000).round().clamp(1, 999),
-                  child: Container(color: scheme.error),
-                ),
-              ],
-            ),
-          ),
+          'MADE UP OF',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                letterSpacing: 0.9,
+                fontWeight: FontWeight.w600,
+              ),
         ),
         const SizedBox(height: 16),
         Row(
           children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: scheme.secondary,
-                shape: BoxShape.circle,
+            SizedBox(
+              width: 112,
+              height: 112,
+              child: CustomPaint(
+                painter: _DonutPainter(
+                  assets: net.assetsCents,
+                  debts: net.debtsCents,
+                  assetColor: scheme.secondary,
+                  debtColor: scheme.error,
+                  track: scheme.onSurface.withValues(alpha: 0.06),
+                ),
+                child: Center(
+                  child: Text(
+                    '$pctAssets%',
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.w300),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(width: 8),
-            const Expanded(child: Text('Assets')),
-            MoneyText(
-              fmtCents(net.assetsCents),
-              style: const TextStyle(
-                fontFeatures: [FontFeature.tabularFigures()],
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: scheme.error,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Expanded(child: Text('Debt')),
-            MoneyText(
-              fmtCents(net.debtsCents),
-              style: const TextStyle(
-                fontFeatures: [FontFeature.tabularFigures()],
-                fontWeight: FontWeight.w600,
+            const SizedBox(width: 24),
+            Expanded(
+              child: Column(
+                children: [
+                  legend(scheme.secondary, 'Assets', net.assetsCents,
+                      '$pctAssets%'),
+                  legend(scheme.error, 'Debt', net.debtsCents,
+                      '${100 - pctAssets}%'),
+                ],
               ),
             ),
           ],
@@ -955,7 +972,7 @@ class _AssetsDebtBreakdown extends StatelessWidget {
             }(),
         ],
       ],
-    );
+    ));
   }
 
   Widget _breakdownRow({
@@ -997,6 +1014,60 @@ class _AssetsDebtBreakdown extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A ring split into assets and debt, with rounded ends and a small gap.
+class _DonutPainter extends CustomPainter {
+  _DonutPainter({
+    required this.assets,
+    required this.debts,
+    required this.assetColor,
+    required this.debtColor,
+    required this.track,
+  });
+
+  final int assets;
+  final int debts;
+  final Color assetColor;
+  final Color debtColor;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const stroke = 12.0;
+    final rect = Rect.fromLTWH(stroke / 2, stroke / 2, size.width - stroke,
+        size.height - stroke);
+    final base = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, 0, 6.2832, false, base..color = track);
+    final total = assets + debts;
+    if (total <= 0) return;
+    const gap = 0.22;
+    final full = 6.2832 - gap * 2;
+    final aSweep = full * assets / total;
+    final dSweep = full * debts / total;
+    const start = -1.5708 + gap / 2;
+    Paint arc(Color c) => Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(
+        startAngle: 0,
+        endAngle: 6.2832,
+        colors: [c.withValues(alpha: 0.65), c],
+        transform: const GradientRotation(-1.5708),
+      ).createShader(rect);
+    if (aSweep > 0.02) canvas.drawArc(rect, start, aSweep, false, arc(assetColor));
+    if (dSweep > 0.02) {
+      canvas.drawArc(rect, start + aSweep + gap, dSweep, false, arc(debtColor));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DonutPainter old) =>
+      old.assets != assets || old.debts != debts || old.assetColor != assetColor;
 }
 
 class _ScoreChartPainter extends CustomPainter {
@@ -1107,7 +1178,7 @@ class _CashOutlookCard extends ConsumerWidget {
                 title: MoneyText(
                   fmtCents(points.last.balanceCents),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         fontFeatures: const [FontFeature.tabularFigures()],
                         color: dips ? scheme.onErrorContainer : null,
                       ),

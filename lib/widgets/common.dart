@@ -22,7 +22,9 @@ class MoneyText extends StatelessWidget {
     if (dot == -1) return Text(formatted, style: style);
     final whole = formatted.substring(0, dot);
     final cents = formatted.substring(dot);
-    final base = style ?? DefaultTextStyle.of(context).style;
+    final base = (style ?? DefaultTextStyle.of(context).style).copyWith(
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
     final mutedColor =
         centsColor ??
         (base.color ?? Theme.of(context).colorScheme.onSurface).withValues(
@@ -178,6 +180,233 @@ class InfoButton extends StatelessWidget {
   }
 }
 
+/// The plain translucent surface used by cards, for containers that are not
+/// a [Card] (a hand-built panel, a tab pill).
+BoxDecoration glassDecoration(BuildContext context, {double radius = 20}) {
+  final theme = Theme.of(context);
+  final dark = theme.colorScheme.brightness == Brightness.dark;
+  return BoxDecoration(
+    color: theme.cardTheme.color,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(
+      color: (dark ? Colors.white : Colors.black).withValues(
+        alpha: dark ? 0.09 : 0.08,
+      ),
+    ),
+  );
+}
+
+/// A compact pill-shaped tab switcher that is only as wide as its labels.
+/// Drives a [TabController], so it replaces a TabBar one for one.
+class PillTabs extends StatelessWidget {
+  const PillTabs({super.key, required this.controller, required this.labels});
+
+  final TabController controller;
+  final List<String> labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = scheme.brightness == Brightness.dark;
+    // Opaque, so nothing behind it shows through unevenly.
+    final fill = Color.alphaBlend(
+      (dark ? Colors.white : Colors.black).withValues(alpha: dark ? 0.07 : 0.05),
+      Theme.of(context).scaffoldBackgroundColor,
+    );
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: (dark ? Colors.white : Colors.black).withValues(alpha: 0.09),
+        ),
+      ),
+      child: ListenableBuilder(
+        listenable: controller,
+        builder: (context, _) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < labels.length; i++)
+              InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => controller.animateTo(i),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: i == controller.index
+                        ? scheme.primary.withValues(alpha: 0.18)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Text(
+                    labels[i],
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: i == controller.index
+                          ? scheme.onSurface
+                          : scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Choice between the two kinds of profile, made once when it is created.
+class SyncModePicker extends StatelessWidget {
+  const SyncModePicker({super.key, required this.value, required this.onChanged});
+
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(
+              value: 'manual',
+              icon: Icon(Icons.edit_note),
+              label: Text('Manual'),
+            ),
+            ButtonSegment(
+              value: 'synced',
+              icon: Icon(Icons.sync),
+              label: Text('Synced'),
+            ),
+          ],
+          selected: {value},
+          onSelectionChanged: (s) => onChanged(s.first),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value == 'synced'
+              ? 'Accounts and transactions come from your bank through '
+                  'SimpleFIN. Nothing is typed in by hand.'
+              : 'You enter transactions and balances yourself, or import a '
+                  'CSV. Nothing connects to a bank.',
+          style: TextStyle(color: muted, fontSize: 12.5, height: 1.4),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'This is fixed once the profile is made.',
+          style: TextStyle(color: muted, fontSize: 12.5),
+        ),
+      ],
+    );
+  }
+}
+
+/// The soft colour glow behind the page. Cards are translucent, so this is
+/// what gives them something to sit on. Static gradients only (no blur), so
+/// it costs nothing while scrolling.
+class AmbientBackground extends StatelessWidget {
+  const AmbientBackground({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = scheme.brightness == Brightness.dark;
+    final glow = dark ? 0.16 : 0.12;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-0.9, -1.1),
+                  radius: 1.1,
+                  colors: [
+                    scheme.primary.withValues(alpha: glow),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(1.1, 1.0),
+                  radius: 1.0,
+                  colors: [
+                    scheme.secondary.withValues(alpha: glow * 0.75),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        child,
+      ],
+    );
+  }
+}
+
+/// A hero surface: a tinted gradient fill with a lit top edge. Meant for the
+/// one or two cards on a screen that should lead, not for every row.
+class GlassCard extends StatelessWidget {
+  const GlassCard({
+    super.key,
+    required this.child,
+    this.tint,
+    this.padding = const EdgeInsets.all(24),
+  });
+
+  final Widget child;
+
+  /// Colours the fill; defaults to the theme's primary accent.
+  final Color? tint;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = scheme.brightness == Brightness.dark;
+    final color = tint ?? scheme.primary;
+    final radius = BorderRadius.circular(20);
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: dark ? 0.22 : 0.16),
+            color.withValues(alpha: dark ? 0.05 : 0.04),
+          ],
+        ),
+        border: Border.all(
+          color: (dark ? Colors.white : Colors.black).withValues(
+            alpha: dark ? 0.12 : 0.08,
+          ),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: Padding(padding: padding, child: child),
+      ),
+    );
+  }
+}
+
 /// Section label with an icon, used above every card group.
 class SectionHeader extends StatelessWidget {
   const SectionHeader(
@@ -208,11 +437,18 @@ class SectionHeader extends StatelessWidget {
         children: [
           Icon(
             icon,
-            size: 18,
+            size: 16,
             color: iconColor ?? Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(width: 8),
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            title.toUpperCase(),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.0,
+            ),
+          ),
           if (info != null) ...[const SizedBox(width: 4), info!],
           if (action != null) ...[const Spacer(), action!],
         ],
@@ -249,10 +485,9 @@ class StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: width,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+      child: GlassCard(
+        tint: color,
+        child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -261,9 +496,11 @@ class StatCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      label,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      label.toUpperCase(),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        letterSpacing: 0.9,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -277,8 +514,8 @@ class StatCard extends StatelessWidget {
               MoneyText(
                 value,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w300,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
@@ -290,7 +527,6 @@ class StatCard extends StatelessWidget {
                 ),
             ],
           ),
-        ),
       ),
     );
   }

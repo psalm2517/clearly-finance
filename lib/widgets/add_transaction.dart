@@ -8,6 +8,7 @@ import '../data/transaction_draft.dart';
 import '../main.dart';
 import '../screens/accounts.dart' show accountIcon, accountTypeColor;
 import '../util/money.dart';
+import 'category_picker.dart';
 import 'common.dart';
 
 /// The one way to record money: an expense, income, a transfer between your
@@ -23,6 +24,7 @@ Future<void> showAddTransaction(
   WidgetRef ref, {
   BudgetEntry? existing,
   DraftKind? kind,
+  bool recurringOnly = false,
 }) async {
   final repo = ref.read(repositoryProvider);
   final profileId = ref.read(activeProfileProvider)!.id;
@@ -63,6 +65,7 @@ Future<void> showAddTransaction(
       existingSplits: splits,
       existingTags: tags,
       initialKind: kind,
+      recurringOnly: recurringOnly,
     ),
   );
 }
@@ -96,6 +99,7 @@ class _AddTransactionDialog extends StatefulWidget {
     required this.existingSplits,
     required this.existingTags,
     required this.initialKind,
+    this.recurringOnly = false,
   });
 
   final WidgetRef ref;
@@ -113,6 +117,10 @@ class _AddTransactionDialog extends StatefulWidget {
   final List<String> existingTags;
   final DraftKind? initialKind;
 
+  /// Only a schedule can be made: used where a one-off has no place (a
+  /// synced profile's one-offs all come from the bank).
+  final bool recurringOnly;
+
   @override
   State<_AddTransactionDialog> createState() => _AddTransactionDialogState();
 }
@@ -129,6 +137,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
   var _repeats = false;
   var _frequency = PayFrequency.monthly;
   var _autoCategorized = false;
+  var _always = false;
   var _saving = false;
   String? _error;
 
@@ -196,6 +205,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
       }
     } else {
       _kind = widget.initialKind ?? DraftKind.expense;
+      if (widget.recurringOnly && _canRepeat) _repeats = true;
     }
     if (_kind == DraftKind.payment) _defaultPayable();
     if (widget.accounts.length >= 2) {
@@ -232,7 +242,11 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
         _kind = k;
         _error = null;
         if (k == DraftKind.payment) _defaultPayable();
-        if (!_canRepeat) _repeats = false;
+        if (!_canRepeat) {
+          _repeats = false;
+        } else if (widget.recurringOnly) {
+          _repeats = true;
+        }
         // A card can't receive repeating income.
         if (_kind == DraftKind.income &&
             _repeats &&
@@ -319,6 +333,68 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
     );
   }
 
+  Future<void> _chooseCategory() async {
+    final income = _kind == DraftKind.income;
+    final label = _payee.text.trim().isNotEmpty
+        ? _payee.text.trim()
+        : _name.text.trim();
+    var picked = _category.text.trim();
+    var always = _always;
+    final chosen = await showDialog<({String category, bool always})>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocal) => AlertDialog(
+          title: Text(income ? 'Income category' : 'Category'),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 300,
+                  child: CategoryPicker(
+                    income: income,
+                    used: widget.targetCategories,
+                    selected: picked,
+                    onSelected: (c) => setLocal(() => picked = c),
+                  ),
+                ),
+                if (_editing && label.isNotEmpty)
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: always,
+                    onChanged: (v) => setLocal(() => always = v ?? false),
+                    title: Text('Always use this for "$label"'),
+                    subtitle: const Text(
+                        'Moves the ones already there and sorts new ones '
+                        'automatically.'),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: picked.isEmpty
+                    ? null
+                    : () =>
+                        Navigator.pop(context, (category: picked, always: always)),
+                child: const Text('Use')),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null || !mounted) return;
+    setState(() {
+      _category.text = chosen.category;
+      _autoCategorized = false;
+      _always = chosen.always;
+    });
+  }
+
   Future<void> _saveEdit(HomebaseRepository repo) async {
     final existing = widget.existing!;
     final cents = _cents!;
@@ -361,6 +437,13 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
             Value(src != null && src[0] == 'card' ? int.parse(src[1]) : null),
       ),
     );
+    if (_always && !_splitMode && _category.text.trim().isNotEmpty) {
+      await repo.setEntryCategory(
+          profileId: widget.profileId,
+          id: existing.id,
+          category: _category.text.trim(),
+          applyToSimilar: true);
+    }
     // Set unconditionally, so turning splits or tags off actually clears them.
     await repo.setEntrySplits(
         profileId: widget.profileId, entryId: existing.id, splits: splits);
@@ -425,15 +508,16 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
               else
                 SegmentedButton<DraftKind>(
                   showSelectedIcon: false,
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                         value: DraftKind.expense, label: Text('Expense')),
                     ButtonSegment(
                         value: DraftKind.income, label: Text('Income')),
                     ButtonSegment(
                         value: DraftKind.transfer, label: Text('Transfer')),
-                    ButtonSegment(
-                        value: DraftKind.payment, label: Text('Payment')),
+                    if (!widget.recurringOnly)
+                      const ButtonSegment(
+                          value: DraftKind.payment, label: Text('Payment')),
                   ],
                   selected: {_kind},
                   onSelectionChanged: (s) => _setKind(s.first),
@@ -501,8 +585,17 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                     onChanged: (_) => _autoCategorized = false,
                     decoration: InputDecoration(
                         labelText: 'Category',
-                        helperText:
-                            _autoCategorized ? 'Auto-categorized by rule' : null,
+                        helperText: _always
+                            ? 'Saving also sorts the other entries like this '
+                                'one, and new ones'
+                            : _autoCategorized
+                                ? 'Auto-categorized by rule'
+                                : null,
+                        suffixIcon: IconButton(
+                          tooltip: 'Choose a category',
+                          icon: const Icon(Icons.expand_more),
+                          onPressed: _chooseCategory,
+                        ),
                         border: const OutlineInputBorder()),
                   ),
                 if (!_repeats) ...[
@@ -785,7 +878,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                   onPressed: _locked ? null : _pickDate,
                 ),
               ),
-              if (_canRepeat) ...[
+              if (_canRepeat && !widget.recurringOnly) ...[
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Repeats'),

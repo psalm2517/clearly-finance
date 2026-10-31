@@ -84,21 +84,15 @@ class NetWorthChartPainter extends CustomPainter {
         ? size.width / 2
         : i * size.width / (history.length - 1);
 
-    // A real graph-paper grid — horizontal and vertical — fills what would
-    // otherwise be dead space under the line with a sense of scale, the
-    // way most technical charting tools look by default.
+    // Faint horizontal guides only: enough scale to read against, nothing
+    // that competes with the line.
     final gridLine = Paint()
-      ..color = grid.withValues(alpha: 0.35)
+      ..color = label.withValues(alpha: 0.06)
       ..strokeWidth = 1;
     const rows = 4;
     for (var i = 1; i < rows; i++) {
       final y = chartHeight * i / rows;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridLine);
-    }
-    const columns = 8;
-    for (var i = 1; i < columns; i++) {
-      final x = size.width * i / columns;
-      canvas.drawLine(Offset(x, 0), Offset(x, chartHeight), gridLine);
     }
 
     // Zero baseline, dashed.
@@ -121,20 +115,33 @@ class NetWorthChartPainter extends CustomPainter {
       ..lineTo(xFor(values.length - 1), zeroY)
       ..lineTo(xFor(0), zeroY)
       ..close();
-    canvas.drawPath(fill, Paint()..color = ending.withValues(alpha: 0.12));
+    canvas.drawPath(
+      fill,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            ending.withValues(alpha: 0.32),
+            ending.withValues(alpha: 0.0),
+          ],
+        ).createShader(Rect.fromLTWH(0, 0, size.width, chartHeight)),
+    );
 
     canvas.drawPath(
       path,
       Paint()
         ..color = ending
-        ..strokeWidth = 2.5
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke,
     );
 
     // End point emphasised with its value.
     final lastX = xFor(values.length - 1);
     final lastY = yFor(values.last);
-    canvas.drawCircle(Offset(lastX, lastY), 4, Paint()..color = ending);
+    canvas.drawCircle(Offset(lastX, lastY), 3.5, Paint()..color = ending);
 
     if (hoverIndex != null && hoverIndex! < values.length) {
       final hx = xFor(hoverIndex!);

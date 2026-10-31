@@ -35,6 +35,11 @@ class Profiles extends Table {
   TextColumn get name => text().withLength(min: 1, max: 64)();
   TextColumn get pinHash => text().nullable()();
   BoolColumn get isAdmin => boolean().withDefault(const Constant(false))();
+
+  /// 'manual' or 'synced'. Chosen when the profile is made and never changed:
+  /// a manual profile has no bank connection, and a synced profile takes its
+  /// accounts and transactions only from the bank.
+  TextColumn get syncMode => text().withDefault(const Constant('manual'))();
 }
 
 class CreditCards extends Table {
@@ -634,7 +639,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 26;
+  int get schemaVersion => 28;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -891,6 +896,64 @@ class AppDatabase extends _$AppDatabase {
                   'AND to_account_id IN ($linked))');
             }
           }
+          if (from < 28) {
+            // "Personal" and "Family & Pets" became one category. Names are
+            // plain text everywhere, so every table that holds one is
+            // renamed, and two budget targets become their sum.
+            const merged = 'Personal, Family & Pets';
+            Future<bool> has(String t) async => (await customSelect(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                    variables: [Variable.withString(t)])
+                .get())
+                .isNotEmpty;
+            if (await has('budget_targets')) {
+              await customStatement(
+                  "UPDATE budget_targets SET category = '$merged' "
+                  "WHERE category = 'Personal'");
+              await customStatement(
+                  'UPDATE budget_targets SET monthly_target_cents = '
+                  'monthly_target_cents + (SELECT f.monthly_target_cents '
+                  'FROM budget_targets f WHERE f.profile_id = '
+                  "budget_targets.profile_id AND f.category = 'Family & Pets') "
+                  "WHERE category = '$merged' AND profile_id IN "
+                  "(SELECT profile_id FROM budget_targets "
+                  "WHERE category = 'Family & Pets')");
+              await customStatement(
+                  "DELETE FROM budget_targets WHERE category = 'Family & Pets' "
+                  'AND profile_id IN (SELECT profile_id FROM budget_targets '
+                  "WHERE category = '$merged')");
+            }
+            for (final t in [
+              'budget_targets',
+              'budget_entries',
+              'transaction_splits',
+              'category_rules',
+              'recurring_transactions',
+              'bills',
+            ]) {
+              if (!await has(t)) continue;
+              await customStatement(
+                  "UPDATE $t SET category = '$merged' "
+                  "WHERE category IN ('Personal', 'Family & Pets')");
+            }
+          }
+          if (from < 27) {
+            final cols = await customSelect('PRAGMA table_info(profiles)').get();
+            final has = cols.any((r) => r.read<String>('name') == 'sync_mode');
+            if (cols.isNotEmpty && !has) {
+              await m.addColumn(profiles, profiles.syncMode);
+            }
+            // A profile that already uses the bank becomes a synced one.
+            final tables = await customSelect(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' "
+                    "AND name='simple_fin_connections'")
+                .get();
+            if (tables.isNotEmpty) {
+              await customStatement(
+                  "UPDATE profiles SET sync_mode = 'synced' WHERE id IN "
+                  '(SELECT profile_id FROM simple_fin_connections)');
+            }
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
@@ -942,4 +1005,9 @@ class AppDatabase extends _$AppDatabase {
       // database, same as any other first run.
     }
   }
+}
+
+/// Which kind of profile this is. See [Profiles.syncMode].
+extension ProfileMode on Profile {
+  bool get isSynced => syncMode == 'synced';
 }

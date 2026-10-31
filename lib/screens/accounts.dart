@@ -83,11 +83,15 @@ class AccountsScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _edit(context, ref, null),
-        icon: const Icon(Icons.add),
-        label: const Text('Add account'),
-      ),
+      // A synced profile's accounts come from the bank.
+      floatingActionButton:
+          (ref.watch(activeProfileProvider)?.isSynced ?? false)
+              ? null
+              : FloatingActionButton.extended(
+                  onPressed: () => _edit(context, ref, null),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add account'),
+                ),
       body: StreamBuilder<List<Account>>(
         stream: repo.watchAccounts(profileId: profileId),
         builder: (context, snap) {

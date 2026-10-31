@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/database.dart';
 import '../main.dart';
 import '../util/pin.dart';
+import '../widgets/common.dart' show SyncModePicker, AmbientBackground;
 
 /// The name and tagline, in type only. There is deliberately no mark here
 /// until Clearly has a real logo.
@@ -67,17 +68,20 @@ class ProfilePickerScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(repositoryProvider);
-    return Scaffold(
-      body: FutureBuilder(
-        future: repo.allProfiles(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final profiles = snapshot.data!;
-          if (profiles.isEmpty) return const _FirstRunSetup();
-          return _Picker(profiles: profiles);
-        },
+    return AmbientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: FutureBuilder(
+          future: repo.allProfiles(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final profiles = snapshot.data!;
+            if (profiles.isEmpty) return const _FirstRunSetup();
+            return _Picker(profiles: profiles);
+          },
+        ),
       ),
     );
   }
@@ -236,6 +240,7 @@ class _FirstRunSetup extends ConsumerStatefulWidget {
 class _FirstRunSetupState extends ConsumerState<_FirstRunSetup> {
   final _name = TextEditingController();
   final _pin = TextEditingController();
+  String _mode = 'manual';
   bool _busy = false;
 
   Future<void> _create() async {
@@ -246,6 +251,7 @@ class _FirstRunSetupState extends ConsumerState<_FirstRunSetup> {
       ProfilesCompanion.insert(
         name: _name.text.trim(),
         isAdmin: const Value(true),
+        syncMode: Value(_mode),
         pinHash: Value(_pin.text.isEmpty ? null : hashPin(_pin.text)),
       ),
     );
@@ -311,6 +317,11 @@ class _FirstRunSetupState extends ConsumerState<_FirstRunSetup> {
                           helperMaxLines: 2,
                           border: OutlineInputBorder(),
                         ),
+                      ),
+                      const SizedBox(height: 16),
+                      SyncModePicker(
+                        value: _mode,
+                        onChanged: (v) => setState(() => _mode = v),
                       ),
                       const SizedBox(height: 20),
                       FilledButton(

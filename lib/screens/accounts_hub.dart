@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/common.dart' show PillTabs;
+
 import '../widgets/lazy_indexed_stack.dart';
 import 'accounts.dart';
 import 'accounts_overview.dart';
@@ -36,7 +38,6 @@ class _AccountsHubScreenState extends State<AccountsHubScreen>
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Column(
       children: [
         Align(
@@ -45,33 +46,9 @@ class _AccountsHubScreenState extends State<AccountsHubScreen>
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
             // A pill-shaped segmented control, not Material's default
             // underline TabBar, for switching between a handful of views.
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: TabBar(
-                controller: _controller,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                dividerColor: Colors.transparent,
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicator: BoxDecoration(
-                  color: scheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                labelColor: scheme.onSurface,
-                unselectedLabelColor: scheme.onSurfaceVariant,
-                labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-                tabs: const [
-                  Tab(text: 'Overview'),
-                  Tab(text: 'Cash'),
-                  Tab(text: 'Cards'),
-                  Tab(text: 'Loans'),
-                  Tab(text: 'Goals'),
-                ],
-              ),
+            child: PillTabs(
+              controller: _controller,
+              labels: const ['Overview', 'Cash', 'Cards', 'Loans', 'Goals'],
             ),
           ),
         ),

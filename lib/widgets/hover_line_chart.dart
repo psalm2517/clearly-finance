@@ -86,14 +86,14 @@ class _HoverLineChartState extends State<HoverLineChart> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 6),
                         decoration: BoxDecoration(
-                          color: scheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.25),
-                              blurRadius: 6,
-                            ),
-                          ],
+                          color: Color.alphaBlend(
+                            scheme.primary.withValues(alpha: 0.10),
+                            scheme.surfaceContainerHighest,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.12),
+                          ),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -103,7 +103,7 @@ class _HoverLineChartState extends State<HoverLineChart> {
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                   fontFeatures: [FontFeature.tabularFigures()],
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                   fontSize: 12),
                             ),
                             Text(

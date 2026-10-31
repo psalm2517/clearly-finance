@@ -359,6 +359,10 @@ extension SimpleFinRepository on HomebaseRepository {
                       : -e.amountCents,
                 ) ??
                 categoryForMcc(t.mcc) ??
+                (e.type == EntryType.income
+                    ? incomeCategoryFromText(
+                        '${e.description ?? ''} ${t.payee}')
+                    : null) ??
                 'Other';
           }
           await (_db.update(
@@ -480,6 +484,10 @@ extension SimpleFinRepository on HomebaseRepository {
               amountCents: t.amountCents,
             ) ??
             categoryForMcc(t.mcc) ??
+            (t.amountCents >= 0
+                ? incomeCategoryFromText(
+                    '$label ${t.payee ?? ''} ${t.memo ?? ''}')
+                : null) ??
             'Other';
         final entryId = await _db
             .into(_db.budgetEntries)
@@ -1093,7 +1101,10 @@ extension SimpleFinRepository on HomebaseRepository {
           amountCents: e.type == EntryType.income
               ? e.amountCents
               : -e.amountCents,
-        );
+        ) ??
+            (e.type == EntryType.income
+                ? incomeCategoryFromText('$text ${e.payee ?? ''}')
+                : null);
         if (guess == null || guess == 'Other') continue;
         await (_db.update(_db.budgetEntries)..where((x) => x.id.equals(e.id)))
             .write(BudgetEntriesCompanion(category: Value(guess)));

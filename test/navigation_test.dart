@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:clearly/data/database.dart';
@@ -9,6 +10,7 @@ import 'package:clearly/main.dart';
 import 'package:clearly/screens/nav.dart';
 import 'package:clearly/screens/shell.dart';
 import 'package:clearly/theme/catppuccin.dart';
+import 'package:clearly/widgets/common.dart' show PillTabs;
 
 void main() {
   Future<void> settle(WidgetTester tester) async {
@@ -57,30 +59,43 @@ void main() {
 
     for (final d in Dest.values) {
       await tester.tap(find.descendant(
-          of: find.byType(NavigationRail), matching: find.text(d.title)));
+          of: find.byType(AppSidebar), matching: find.text(d.title)));
       await settle(tester);
       expect(tester.takeException(), isNull, reason: 'opening ${d.title}');
     }
 
     // Tabbed pages: Accounts has Goals now, Recurring has all five.
     await tester.tap(find.descendant(
-        of: find.byType(NavigationRail), matching: find.text('Accounts')));
+        of: find.byType(AppSidebar), matching: find.text('Accounts')));
     await settle(tester);
     Finder tab(String t) =>
-        find.descendant(of: find.byType(TabBar), matching: find.text(t));
+        find.descendant(of: find.byType(PillTabs), matching: find.text(t));
     expect(tab('Goals'), findsOneWidget);
     expect(tab('Transfers'), findsNothing,
         reason: 'scheduled transfers live under Recurring now');
 
     await tester.tap(find.descendant(
-        of: find.byType(NavigationRail), matching: find.text('Recurring')));
+        of: find.byType(AppSidebar), matching: find.text('Recurring')));
     await settle(tester);
     Finder tabFinder(String t) =>
-        find.descendant(of: find.byType(TabBar), matching: find.text(t));
+        find.descendant(of: find.byType(PillTabs), matching: find.text(t));
     for (final tab in ['Upcoming', 'Bills', 'Paychecks', 'Transfers', 'Other']) {
       expect(tabFinder(tab), findsOneWidget, reason: tab);
     }
     expect(tester.takeException(), isNull);
+
+    // Tab and Shift+Tab step through the sidebar.
+    final container = ProviderScope.containerOf(
+        tester.element(find.byType(AppSidebar)));
+    container.read(navProvider.notifier).state = Dest.dashboard;
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await settle(tester);
+    expect(container.read(navProvider), Dest.accounts);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await settle(tester);
+    expect(container.read(navProvider), Dest.dashboard);
 
     // Unmount and let the database streams' cleanup timers run out.
     await tester.pumpWidget(const SizedBox());

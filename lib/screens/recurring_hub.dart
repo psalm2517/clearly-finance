@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../widgets/add_transaction.dart' show showAddTransaction;
+import '../widgets/common.dart' show PillTabs;
 
 import '../widgets/lazy_indexed_stack.dart';
 import 'bills.dart';
@@ -33,41 +37,34 @@ class _RecurringHubScreenState extends State<RecurringHubScreen>
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Column(
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(28, 20, 28, 0),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: TabBar(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(28, 20, 28, 0),
+          child: Row(
+            children: [
+              PillTabs(
                 controller: _controller,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                dividerColor: Colors.transparent,
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicator: BoxDecoration(
-                  color: scheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                labelColor: scheme.onSurface,
-                unselectedLabelColor: scheme.onSurfaceVariant,
-                labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-                tabs: const [
-                  Tab(text: 'Upcoming'),
-                  Tab(text: 'Bills'),
-                  Tab(text: 'Paychecks'),
-                  Tab(text: 'Transfers'),
-                  Tab(text: 'Other'),
+                labels: const [
+                  'Upcoming',
+                  'Bills',
+                  'Paychecks',
+                  'Transfers',
+                  'Other',
                 ],
               ),
-            ),
+              const Spacer(),
+              // Works in a synced profile too: a schedule is a plan, not a
+              // transaction, so the bank is not its source.
+              Consumer(
+                builder: (context, ref, _) => FilledButton.icon(
+                  onPressed: () =>
+                      showAddTransaction(context, ref, recurringOnly: true),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add recurring'),
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(

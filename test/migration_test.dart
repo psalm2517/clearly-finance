@@ -1163,4 +1163,44 @@ void main() {
     expect(payments.firstWhere((p) => p.amountCents == 4000).externalId,
         isNull);
   });
+
+  test('a v27 database merges Personal and Family & Pets into one category',
+      () async {
+    final dir = Directory.systemTemp.createTempSync('homebase_v27');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final f = File('${dir.path}/homebase.sqlite');
+
+    var db = AppDatabase.forTesting(NativeDatabase(f));
+    final repo = HomebaseRepository(db);
+    final p1 = await repo.createProfile(ProfilesCompanion.insert(name: 'A'));
+    final p2 = await repo.createProfile(ProfilesCompanion.insert(name: 'B'));
+    await db.close();
+
+    final raw = sqlite3.open(f.path);
+    for (final (pid, cat, cents) in [
+      (p1, 'Personal', 10000),
+      (p1, 'Family & Pets', 5000),
+      (p2, 'Family & Pets', 7000),
+    ]) {
+      raw.execute('INSERT INTO budget_targets (profile_id, category, '
+          'monthly_target_cents) VALUES ($pid, \'$cat\', $cents)');
+    }
+    raw.execute("INSERT INTO budget_entries (profile_id, date, category, "
+        "amount_cents, type) VALUES ($p1, 0, 'Family & Pets', 900, 'expense')");
+    raw.execute('PRAGMA user_version = 27;');
+    raw.close();
+
+    db = AppDatabase.forTesting(NativeDatabase(f));
+    addTearDown(db.close);
+    final targets = await db.select(db.budgetTargets).get();
+    final byProfile = {for (final t in targets) t.profileId: t};
+    expect(targets, hasLength(2));
+    expect(byProfile[p1]!.category, 'Personal, Family & Pets');
+    expect(byProfile[p1]!.monthlyTargetCents, 15000,
+        reason: 'two targets become their sum');
+    expect(byProfile[p2]!.category, 'Personal, Family & Pets');
+    expect(byProfile[p2]!.monthlyTargetCents, 7000);
+    final entry = await db.select(db.budgetEntries).getSingle();
+    expect(entry.category, 'Personal, Family & Pets');
+  });
 }

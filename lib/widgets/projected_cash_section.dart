@@ -120,7 +120,7 @@ class _ProjectedCashBalanceSectionState
                     fmtCents(end),
                     style: Theme.of(context).textTheme.headlineMedium
                         ?.copyWith(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                   ),

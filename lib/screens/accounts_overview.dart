@@ -332,7 +332,7 @@ class _NetWorthHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              _money(context, netCents, size: 34, weight: FontWeight.w700),
+              _money(context, netCents, size: 34, weight: FontWeight.w300),
               if (change != null && history.length >= 2) ...[
                 const SizedBox(height: 4),
                 Text(
@@ -377,11 +377,7 @@ class _GroupSection extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Container(
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
+        decoration: glassDecoration(context),
         child: Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
@@ -395,7 +391,7 @@ class _GroupSection extends StatelessWidget {
                   child: Text(
                     group.title,
                     style: const TextStyle(
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
                   ),
@@ -404,7 +400,7 @@ class _GroupSection extends StatelessWidget {
                   context,
                   group.totalCents,
                   size: 17,
-                  weight: FontWeight.w700,
+                  weight: FontWeight.w600,
                 ),
               ],
             ),
@@ -474,14 +470,9 @@ class _SummaryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
+      decoration: glassDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -490,7 +481,7 @@ class _SummaryPanel extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'Summary',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                 ),
               ),
               SegmentedButton<bool>(
@@ -549,10 +540,10 @@ class _SummarySection extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
-            _money(context, total, size: 16, weight: FontWeight.w700),
+            _money(context, total, size: 16, weight: FontWeight.w600),
           ],
         ),
         const SizedBox(height: 8),

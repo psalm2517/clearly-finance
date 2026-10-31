@@ -85,7 +85,7 @@ const suggestedRules = <SuggestedRule>[
   SuggestedRule('target', Cat.personal),
   SuggestedRule('walmart', Cat.personal),
   SuggestedRule('best buy', Cat.personal),
-  // Family & Pets
-  SuggestedRule('petco', Cat.family),
-  SuggestedRule('petsmart', Cat.family),
+  // Family & Pets (now part of Personal)
+  SuggestedRule('petco', Cat.personal),
+  SuggestedRule('petsmart', Cat.personal),
 ];

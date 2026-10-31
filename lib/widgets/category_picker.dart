@@ -12,6 +12,7 @@ class CategoryPicker extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     this.exclude,
+    this.income = false,
   });
 
   /// Every category in use, so the person's own ones are offered too.
@@ -22,10 +23,13 @@ class CategoryPicker extends StatelessWidget {
   /// A category not to offer (the one being moved away from).
   final String? exclude;
 
+  /// Offer the income categories instead of the spending ones.
+  final bool income;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final groups = orderedCategories(used);
+    final groups = orderedCategories(used, income: income);
     final builtIn = groups.builtIn.where((c) => c != exclude).toList();
     final yours = groups.yours.where((c) => c != exclude).toList();
 

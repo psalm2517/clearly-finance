@@ -214,7 +214,7 @@ class _SpendingByCategoryState extends ConsumerState<SpendingByCategory> {
                           fmtCents(totals[cat]!),
                           textAlign: TextAlign.right,
                           style: const TextStyle(
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
                             fontSize: 15,
                             fontFeatures: [FontFeature.tabularFigures()],
                           ),

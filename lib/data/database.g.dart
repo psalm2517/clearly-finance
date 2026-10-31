@@ -60,8 +60,20 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _syncModeMeta = const VerificationMeta(
+    'syncMode',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, pinHash, isAdmin];
+  late final GeneratedColumn<String> syncMode = GeneratedColumn<String>(
+    'sync_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('manual'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, pinHash, isAdmin, syncMode];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -97,6 +109,12 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
         isAdmin.isAcceptableOrUnknown(data['is_admin']!, _isAdminMeta),
       );
     }
+    if (data.containsKey('sync_mode')) {
+      context.handle(
+        _syncModeMeta,
+        syncMode.isAcceptableOrUnknown(data['sync_mode']!, _syncModeMeta),
+      );
+    }
     return context;
   }
 
@@ -122,6 +140,10 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_admin'],
       )!,
+      syncMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_mode'],
+      )!,
     );
   }
 
@@ -136,11 +158,17 @@ class Profile extends DataClass implements Insertable<Profile> {
   final String name;
   final String? pinHash;
   final bool isAdmin;
+
+  /// 'manual' or 'synced'. Chosen when the profile is made and never changed:
+  /// a manual profile has no bank connection, and a synced profile takes its
+  /// accounts and transactions only from the bank.
+  final String syncMode;
   const Profile({
     required this.id,
     required this.name,
     this.pinHash,
     required this.isAdmin,
+    required this.syncMode,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -151,6 +179,7 @@ class Profile extends DataClass implements Insertable<Profile> {
       map['pin_hash'] = Variable<String>(pinHash);
     }
     map['is_admin'] = Variable<bool>(isAdmin);
+    map['sync_mode'] = Variable<String>(syncMode);
     return map;
   }
 
@@ -162,6 +191,7 @@ class Profile extends DataClass implements Insertable<Profile> {
           ? const Value.absent()
           : Value(pinHash),
       isAdmin: Value(isAdmin),
+      syncMode: Value(syncMode),
     );
   }
 
@@ -175,6 +205,7 @@ class Profile extends DataClass implements Insertable<Profile> {
       name: serializer.fromJson<String>(json['name']),
       pinHash: serializer.fromJson<String?>(json['pinHash']),
       isAdmin: serializer.fromJson<bool>(json['isAdmin']),
+      syncMode: serializer.fromJson<String>(json['syncMode']),
     );
   }
   @override
@@ -185,6 +216,7 @@ class Profile extends DataClass implements Insertable<Profile> {
       'name': serializer.toJson<String>(name),
       'pinHash': serializer.toJson<String?>(pinHash),
       'isAdmin': serializer.toJson<bool>(isAdmin),
+      'syncMode': serializer.toJson<String>(syncMode),
     };
   }
 
@@ -193,11 +225,13 @@ class Profile extends DataClass implements Insertable<Profile> {
     String? name,
     Value<String?> pinHash = const Value.absent(),
     bool? isAdmin,
+    String? syncMode,
   }) => Profile(
     id: id ?? this.id,
     name: name ?? this.name,
     pinHash: pinHash.present ? pinHash.value : this.pinHash,
     isAdmin: isAdmin ?? this.isAdmin,
+    syncMode: syncMode ?? this.syncMode,
   );
   Profile copyWithCompanion(ProfilesCompanion data) {
     return Profile(
@@ -205,6 +239,7 @@ class Profile extends DataClass implements Insertable<Profile> {
       name: data.name.present ? data.name.value : this.name,
       pinHash: data.pinHash.present ? data.pinHash.value : this.pinHash,
       isAdmin: data.isAdmin.present ? data.isAdmin.value : this.isAdmin,
+      syncMode: data.syncMode.present ? data.syncMode.value : this.syncMode,
     );
   }
 
@@ -214,13 +249,14 @@ class Profile extends DataClass implements Insertable<Profile> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('pinHash: $pinHash, ')
-          ..write('isAdmin: $isAdmin')
+          ..write('isAdmin: $isAdmin, ')
+          ..write('syncMode: $syncMode')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, pinHash, isAdmin);
+  int get hashCode => Object.hash(id, name, pinHash, isAdmin, syncMode);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -228,7 +264,8 @@ class Profile extends DataClass implements Insertable<Profile> {
           other.id == this.id &&
           other.name == this.name &&
           other.pinHash == this.pinHash &&
-          other.isAdmin == this.isAdmin);
+          other.isAdmin == this.isAdmin &&
+          other.syncMode == this.syncMode);
 }
 
 class ProfilesCompanion extends UpdateCompanion<Profile> {
@@ -236,29 +273,34 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
   final Value<String> name;
   final Value<String?> pinHash;
   final Value<bool> isAdmin;
+  final Value<String> syncMode;
   const ProfilesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.pinHash = const Value.absent(),
     this.isAdmin = const Value.absent(),
+    this.syncMode = const Value.absent(),
   });
   ProfilesCompanion.insert({
     this.id = const Value.absent(),
     required String name,
     this.pinHash = const Value.absent(),
     this.isAdmin = const Value.absent(),
+    this.syncMode = const Value.absent(),
   }) : name = Value(name);
   static Insertable<Profile> custom({
     Expression<int>? id,
     Expression<String>? name,
     Expression<String>? pinHash,
     Expression<bool>? isAdmin,
+    Expression<String>? syncMode,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (pinHash != null) 'pin_hash': pinHash,
       if (isAdmin != null) 'is_admin': isAdmin,
+      if (syncMode != null) 'sync_mode': syncMode,
     });
   }
 
@@ -267,12 +309,14 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     Value<String>? name,
     Value<String?>? pinHash,
     Value<bool>? isAdmin,
+    Value<String>? syncMode,
   }) {
     return ProfilesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       pinHash: pinHash ?? this.pinHash,
       isAdmin: isAdmin ?? this.isAdmin,
+      syncMode: syncMode ?? this.syncMode,
     );
   }
 
@@ -291,6 +335,9 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     if (isAdmin.present) {
       map['is_admin'] = Variable<bool>(isAdmin.value);
     }
+    if (syncMode.present) {
+      map['sync_mode'] = Variable<String>(syncMode.value);
+    }
     return map;
   }
 
@@ -300,7 +347,8 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('pinHash: $pinHash, ')
-          ..write('isAdmin: $isAdmin')
+          ..write('isAdmin: $isAdmin, ')
+          ..write('syncMode: $syncMode')
           ..write(')'))
         .toString();
   }
@@ -13970,12 +14018,14 @@ typedef $$ProfilesTableCreateCompanionBuilder = ProfilesCompanion Function({
   required String name,
   Value<String?> pinHash,
   Value<bool> isAdmin,
+  Value<String> syncMode,
 });
 typedef $$ProfilesTableUpdateCompanionBuilder = ProfilesCompanion Function({
   Value<int> id,
   Value<String> name,
   Value<String?> pinHash,
   Value<bool> isAdmin,
+  Value<String> syncMode,
 });
 
 final class $$ProfilesTableReferences
@@ -14520,6 +14570,11 @@ class $$ProfilesTableFilterComposer
 
   ColumnFilters<bool> get isAdmin => $composableBuilder(
     column: $table.isAdmin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncMode => $composableBuilder(
+    column: $table.syncMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15181,6 +15236,11 @@ class $$ProfilesTableOrderingComposer
     column: $table.isAdmin,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get syncMode => $composableBuilder(
+    column: $table.syncMode,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ProfilesTableAnnotationComposer
@@ -15203,6 +15263,9 @@ class $$ProfilesTableAnnotationComposer
 
   GeneratedColumn<bool> get isAdmin =>
       $composableBuilder(column: $table.isAdmin, builder: (column) => column);
+
+  GeneratedColumn<String> get syncMode =>
+      $composableBuilder(column: $table.syncMode, builder: (column) => column);
 
   Expression<T> accountsRefs<T extends Object>(
     Expression<T> Function($$AccountsTableAnnotationComposer a) f,
@@ -15900,11 +15963,13 @@ class $$ProfilesTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String?> pinHash = const Value.absent(),
                 Value<bool> isAdmin = const Value.absent(),
+                Value<String> syncMode = const Value.absent(),
               }) => ProfilesCompanion(
                 id: id,
                 name: name,
                 pinHash: pinHash,
                 isAdmin: isAdmin,
+                syncMode: syncMode,
               ),
           createCompanionCallback:
               ({
@@ -15912,11 +15977,13 @@ class $$ProfilesTableTableManager
                 required String name,
                 Value<String?> pinHash = const Value.absent(),
                 Value<bool> isAdmin = const Value.absent(),
+                Value<String> syncMode = const Value.absent(),
               }) => ProfilesCompanion.insert(
                 id: id,
                 name: name,
                 pinHash: pinHash,
                 isAdmin: isAdmin,
+                syncMode: syncMode,
               ),
           withReferenceMapper: (p0) => p0
               .map(

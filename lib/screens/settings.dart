@@ -159,8 +159,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
         kSectionGap,
-        const BankSyncSection(),
-        kSectionGap,
+        if (ref.watch(activeProfileProvider)?.isSynced ?? false) ...[
+          const BankSyncSection(),
+          kSectionGap,
+        ],
         SectionHeader('Backup',
             icon: Icons.save_outlined,
             info: InfoButton(

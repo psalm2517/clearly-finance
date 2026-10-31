@@ -11,7 +11,7 @@ import 'catppuccin.dart';
 /// flavor choice for the same reason — it is a preference belonging to
 /// this computer, not financial data.
 class AccentController extends StateNotifier<CatppuccinAccent> {
-  AccentController() : super(CatppuccinAccent.mauve) {
+  AccentController() : super(CatppuccinAccent.lavender) {
     _load();
   }
 
