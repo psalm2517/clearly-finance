@@ -19,8 +19,6 @@
 
 ### [⬇ Download for Linux](https://github.com/Psalm2517/clearly-finance/releases/latest/download/Clearly-x86_64.AppImage)
 
-One file. Make it executable (right-click, Properties, Permissions), then double-click it.
-
 Free, open-source personal finance for the desktop. Your data stays on your
 computer.
 
